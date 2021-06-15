@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace Symfony\Component\DependencyInjection\Loader\Configurator;
 
+use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Platforms\AbstractPlatform;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Events;
 use Doctrine\ORM\Tools\ToolEvents;
@@ -123,6 +125,12 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             ->call('setAuditedEntityClasses', [param('simplethings.entityaudit.audited_entities')])
             ->call('setDisabledForeignKeys', [param('simplethings.entityaudit.disable_foreign_keys')])
             ->call('setGlobalIgnoreColumns', [param('simplethings.entityaudit.global_ignore_columns')])
+            ->call('setGlobalIgnoreColumns', [param('simplethings.entityaudit.global_ignore_columns')])
+            ->call('setConvertEnumToString', [param('simplethings.entityaudit.convert_enum_to_string')])
+            ->call('setDatabasePlatform', [
+                (new InlineServiceConfigurator(new Definition(Connection::class)))
+                    ->factory([new ReferenceConfigurator(Connection::class), 'getDatabasePlatform'])
+            ])
             ->call('setTablePrefix', [param('simplethings.entityaudit.table_prefix')])
             ->call('setTableSuffix', [param('simplethings.entityaudit.table_suffix')])
             ->call('setRevisionTableName', [param('simplethings.entityaudit.revision_table_name')])

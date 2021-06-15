@@ -15,11 +15,16 @@ namespace SimpleThings\EntityAudit\EventListener;
 
 use Doctrine\Common\EventSubscriber;
 use Doctrine\DBAL\Schema\Column;
+use Doctrine\DBAL\DriverManager;
+use Doctrine\ORM\EntityManager;
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Schema\Table;
 use Doctrine\DBAL\Types\Type;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping\ClassMetadataInfo;
+use Doctrine\DBAL\Types\Type;
+use Doctrine\DBAL\Types\Types;
+use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\Event\GenerateSchemaEventArgs;
 use Doctrine\ORM\Tools\Event\GenerateSchemaTableEventArgs;
 use Doctrine\ORM\Tools\ToolEvents;
@@ -155,11 +160,22 @@ class CreateSchemaListener implements EventSubscriber
     private function addColumnToTable(Column $column, Table $targetTable): void
     {
         $columnName = $column->getName();
+        $columnTypeName = Type::getTypeRegistry()->lookupName($column->getType());
+        $columnArrayOptions = $column->toArray();
 
-        $targetTable->addColumn(
-            $columnName,
-            Type::getTypeRegistry()->lookupName($column->getType())
-        );
+        // Change Enum type to String.
+        if($this->config->getDatabasePlatform()){
+            $sqlString = $column->getType()->getSQLDeclaration($columnArrayOptions, $this->config->getDatabasePlatform());
+            if ($this->config->getConvertEnumToString() && false !== strpos($sqlString, 'ENUM')) {
+                $columnTypeName = Types::STRING;
+                $columnArrayOptions['type'] = Type::getType($columnTypeName);
+            }
+        }
+
+        $targetTable->addColumn($column->getName(), $columnTypeName, array_merge(
+            $columnArrayOptions,
+            ['notnull' => false, 'autoincrement' => false]
+        ));
 
         $targetColumn = $targetTable->getColumn($columnName);
         $targetColumn->setLength($column->getLength());

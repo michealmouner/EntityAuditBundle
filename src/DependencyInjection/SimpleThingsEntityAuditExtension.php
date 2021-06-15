@@ -40,6 +40,7 @@ class SimpleThingsEntityAuditExtension extends Extension
             'revision_id_field_type',
             'global_ignore_columns',
             'disable_foreign_keys',
+            'convert_enum_to_string',
         ];
 
         foreach ($configurables as $key) {
