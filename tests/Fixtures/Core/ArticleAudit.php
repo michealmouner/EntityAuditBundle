@@ -54,8 +54,8 @@ class ArticleAudit
         $this->text = $text;
     }
 
-    public function setIgnoreme(string $ignoreme): void
+    public function setIgnoreMe(string $ignoreMe): void
     {
-        $this->ignoreme = $ignoreme;
+        $this->ignoreme = $ignoreMe;
     }
 }

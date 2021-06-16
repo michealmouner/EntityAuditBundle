@@ -94,7 +94,18 @@ class CreateSchemaListener implements EventSubscriber
         );
 
         foreach ($entityTable->getColumns() as $column) {
-            $this->addColumnToTable($column, $revisionTable);
+            foreach ($cm->subClasses as $subClass) {
+                if ($cm->hasField($column->getName()) || $cm->hasAssociation($column->getName())) {
+                    if ($this->config->isEntityIgnoredProperty($subClass, $cm->getFieldForColumn($column->getName()))) {
+                        continue 2;
+                    }
+                }
+
+                if (empty($cm->discriminatorColumn) && $this->config->isEntityIgnoredProperty($cm->getName(), $cm->getFieldForColumn($column->getName()))) {
+                    continue;
+                }
+
+                $this->addColumnToTable($column, $revisionTable);
         }
         $revisionTable->addColumn($this->config->getRevisionFieldName(), $this->config->getRevisionIdFieldType());
         $revisionTable->addColumn($this->config->getRevisionTypeFieldName(), Types::STRING, ['length' => 4]);
@@ -168,6 +179,16 @@ class CreateSchemaListener implements EventSubscriber
                 $columnTypeName = Types::STRING;
                 $columnArrayOptions['type'] = Type::getType($columnTypeName);
             }
+        }
+
+        // Ignore specific fields for subclasses in-case of using discriminator column.
+        foreach ($cm->subClasses as $subClass) {
+
+        }
+
+        // Ignore specific fields for table.
+        if (empty($cm->discriminatorColumn) && $this->config->isEntityIgnoredProperty($cm->getName(), $cm->getFieldForColumn($column->getName()))) {
+            continue;
         }
 
         $targetTable->addColumn($column->getName(), $columnTypeName, array_merge(

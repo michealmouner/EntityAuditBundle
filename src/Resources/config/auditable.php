@@ -130,6 +130,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
                 (new InlineServiceConfigurator(new Definition(Connection::class)))
                     ->factory([new ReferenceConfigurator(Connection::class), 'getDatabasePlatform']),
             ])
+            ->call('setEntityIgnoredProperties', [param('simplethings.entityaudit.entity_ignored_properties')])
             ->call('setTablePrefix', [param('simplethings.entityaudit.table_prefix')])
             ->call('setTableSuffix', [param('simplethings.entityaudit.table_suffix')])
             ->call('setRevisionTableName', [param('simplethings.entityaudit.revision_table_name')])
