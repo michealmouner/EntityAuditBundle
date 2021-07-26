@@ -301,9 +301,9 @@ class AuditConfiguration
     /**
      * @return array<string, string[]>
      */
-    final public function getEntityIgnoredProperties(): array
+    final public function getEntityIgnoredProperties($entity): array
     {
-        return $this->entityIgnoredProperties;
+        return $this->entityIgnoredProperties[$entity] ?? [];
     }
 
     /**
@@ -316,6 +316,6 @@ class AuditConfiguration
 
     public function isEntityIgnoredProperty(string $entity, $propertyName): bool
     {
-        return \array_key_exists($entity, $this->getEntityIgnoredProperties()) && \in_array($propertyName, $this->getEntityIgnoredProperties()[$entity], true);
+        return \array_key_exists($entity, $this->getEntityIgnoredProperties($entity)) && \in_array($propertyName, $this->getEntityIgnoredProperties()[$entity], true);
     }
 }
