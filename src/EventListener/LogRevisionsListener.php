@@ -246,12 +246,10 @@ class LogRevisionsListener implements EventSubscriber
         }
 
         // Make sure that ignored columns for table are removed from the changeset.
-        foreach ($this->config->getEntityIgnoredProperties($class->getName()) as $fields) {
-            foreach ($fields as $field) {
-                $column = $class->getColumnName($field);
-                if (isset($changeset[$column])) {
-                    unset($changeset[$column]);
-                }
+        foreach ($this->config->getEntityIgnoredProperties($class->getName()) as $field) {
+            $column = $class->getColumnName($field);
+            if (isset($changeset[$column])) {
+                unset($changeset[$column]);
             }
         }
 

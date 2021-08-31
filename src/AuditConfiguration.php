@@ -316,6 +316,6 @@ class AuditConfiguration
 
     public function isEntityIgnoredProperty(string $entity, $propertyName): bool
     {
-        return \array_key_exists($entity, $this->getEntityIgnoredProperties($entity)) && \in_array($propertyName, $this->getEntityIgnoredProperties()[$entity], true);
+        return \in_array($propertyName, $this->getEntityIgnoredProperties($entity), true);
     }
 }
