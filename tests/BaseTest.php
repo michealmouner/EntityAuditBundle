@@ -27,7 +27,6 @@ use Psr\Clock\ClockInterface;
 use SimpleThings\EntityAudit\AuditConfiguration;
 use SimpleThings\EntityAudit\AuditManager;
 use SimpleThings\EntityAudit\Tests\Fixtures\Core\ProfileAudit;
-use Symfony\Component\Cache\Adapter\ArrayAdapter;
 
 abstract class BaseTest extends TestCase
 {
