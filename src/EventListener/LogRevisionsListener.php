@@ -134,6 +134,11 @@ class LogRevisionsListener implements EventSubscriber
                     }
                 }
 
+                // Ignore specific fields for table.
+                if ($this->config->isEntityIgnoredProperty($meta->getName(), $meta->getFieldForColumn($column))) {
+                    continue;
+                }
+
                 $sql = 'UPDATE '.$this->config->getTableName($meta).' '.
                     'SET '.$field.' = '.$placeholder.' '.
                     'WHERE '.$this->config->getRevisionFieldName().' = ? ';
@@ -221,6 +226,14 @@ class LogRevisionsListener implements EventSubscriber
         // get changes => should be already computed here (is a listener)
         $changeset = $this->uow->getEntityChangeSet($entity);
         foreach ($this->config->getGlobalIgnoreColumns() as $column) {
+            if (isset($changeset[$column])) {
+                unset($changeset[$column]);
+            }
+        }
+
+        // Make sure that ignored columns for table are removed from the changeset.
+        foreach ($this->config->getEntityIgnoredProperties($class->getName()) as $field) {
+            $column = $class->getColumnName($field);
             if (isset($changeset[$column])) {
                 unset($changeset[$column]);
             }
@@ -370,6 +383,11 @@ class LogRevisionsListener implements EventSubscriber
                     continue;
                 }
 
+                // Ignore specific fields for table.
+                if ($this->config->isEntityIgnoredProperty($class->getName(), $field)) {
+                    continue;
+                }
+
                 $type = Type::getType($class->fieldMappings[$field]['type']);
                 $placeholders[] = (!empty($class->fieldMappings[$field]['requireSQLConversion']))
                     ? $type->convertToDatabaseValueSQL('?', $this->platform)
@@ -411,6 +429,13 @@ class LogRevisionsListener implements EventSubscriber
                 continue;
             }
 
+            if ($class->isIdentifier($field) && !empty($entityData[$field]) && is_scalar($entityData[$field])) {
+                $params[] = $entityData[$field];
+                $types[] = $class->getTypeOfField($field);
+
+                continue;
+            }
+
             $data = $entityData[$field] ?? null;
             $relatedId = false;
 
@@ -441,6 +466,11 @@ class LogRevisionsListener implements EventSubscriber
                 && $class->isInheritedField($field)
                 && !$class->isIdentifier($field)
             ) {
+                continue;
+            }
+
+            // Ignore specific fields for table.
+            if ($this->config->isEntityIgnoredProperty($class->getName(), $field)) {
                 continue;
             }
 

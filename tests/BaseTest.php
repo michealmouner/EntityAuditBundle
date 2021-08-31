@@ -25,6 +25,7 @@ use Gedmo;
 use PHPUnit\Framework\TestCase;
 use SimpleThings\EntityAudit\AuditConfiguration;
 use SimpleThings\EntityAudit\AuditManager;
+use SimpleThings\EntityAudit\Tests\Fixtures\Core\ProfileAudit;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
 
 abstract class BaseTest extends TestCase
@@ -73,8 +74,9 @@ abstract class BaseTest extends TestCase
         }
 
         $config = new Configuration();
-        $config->setMetadataCache(new ArrayAdapter());
-        $config->setQueryCacheImpl(DoctrineProvider::wrap(new ArrayAdapter()));
+        $cache = DoctrineProvider::wrap(new ArrayAdapter());
+        $config->setMetadataCacheImpl($cache);
+        $config->setQueryCacheImpl($cache);
         $config->setProxyDir(__DIR__.'/Proxies');
         $config->setAutoGenerateProxyClasses(ProxyFactory::AUTOGENERATE_EVAL);
         $config->setProxyNamespace('SimpleThings\EntityAudit\Tests\Proxies');
@@ -147,7 +149,8 @@ abstract class BaseTest extends TestCase
         $auditConfig = AuditConfiguration::forEntities($this->auditedEntities);
         $auditConfig->setConvertEnumToString(true);
         $auditConfig->setDatabasePlatform($this->getEntityManager()->getConnection()->getDatabasePlatform());
-        $auditConfig->setGlobalIgnoreColumns(['ignoreme']);
+        $auditConfig->setGlobalIgnoreColumns(['ignoreMe']);
+        $auditConfig->setEntityIgnoredProperties([ProfileAudit::class => ['ignoreProperty']]);
         $auditConfig->setUsernameCallable(static function () {
             return 'beberlei';
         });
