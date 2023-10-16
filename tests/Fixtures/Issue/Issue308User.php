@@ -11,39 +11,30 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace SimpleThings\EntityAudit\Tests\Fixtures\Issue;
+namespace Sonata\EntityAuditBundle\Tests\Fixtures\Issue;
 
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
+use Doctrine\Common\Collections\ReadableCollection;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity
- */
+#[ORM\Entity]
 class Issue308User
 {
-    /**
-     * @var int
-     *
-     * @ORM\Id
-     * @ORM\Column(type="integer")
-     * @ORM\GeneratedValue(strategy="AUTO")
-     */
-    private $id;
+    #[ORM\Id]
+    #[ORM\Column(type: Types::INTEGER)]
+    #[ORM\GeneratedValue]
+    protected ?int $id = null;
+
+    #[ORM\ManyToOne(targetEntity: self::class, inversedBy: 'children')]
+    protected ?Issue308User $parent = null;
 
     /**
-     * @var Collection
-     *
-     * @ORM\OneToMany(targetEntity="Issue308User", mappedBy="parent")
+     * @var Collection<int, self>
      */
-    private $children;
-
-    /**
-     * @var Issue308User
-     *
-     * @ORM\ManyToOne(targetEntity="Issue308User", inversedBy="children")
-     */
-    private $parent;
+    #[ORM\OneToMany(targetEntity: self::class, mappedBy: 'parent')]
+    private Collection $children;
 
     public function __construct()
     {
@@ -68,16 +59,19 @@ class Issue308User
         $this->children->add($child);
     }
 
-    public function getChildren(): Collection
+    /**
+     * @return ReadableCollection<int, self>
+     */
+    public function getChildren(): ReadableCollection
     {
-        $activeChildren = $this->children->filter(static function (self $user): bool {
-            return $user->isActive();
-        });
+        $activeChildren = $this->children->filter(
+            static fn (self $user): bool => $user->isActive()
+        );
 
         return $activeChildren;
     }
 
-    public function getParent(): self
+    public function getParent(): ?self
     {
         return $this->parent;
     }

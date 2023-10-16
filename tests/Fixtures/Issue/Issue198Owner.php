@@ -11,27 +11,29 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace SimpleThings\EntityAudit\Tests\Fixtures\Issue;
+namespace Sonata\EntityAuditBundle\Tests\Fixtures\Issue;
 
 use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity()
- */
+#[ORM\Entity]
 class Issue198Owner
 {
     /**
-     * @ORM\Id
-     * @ORM\Column(type="integer")
-     * @ORM\GeneratedValue(strategy="AUTO")
+     * @var int|null
      */
-    private $id;
+    #[ORM\Id]
+    #[ORM\Column(type: Types::INTEGER)]
+    #[ORM\GeneratedValue]
+    protected $id;
 
     /**
-     * @ORM\OneToMany(targetEntity="Issue198Car", mappedBy="owner")
+     * @var Collection<int, Issue198Car>
      */
-    private $cars;
+    #[ORM\OneToMany(targetEntity: Issue198Car::class, mappedBy: 'owner')]
+    private Collection $cars;
 
     public function __construct()
     {
@@ -56,7 +58,10 @@ class Issue198Owner
         $this->cars->removeElement($car);
     }
 
-    public function getCars(): ArrayCollection
+    /**
+     * @return Collection<int, Issue198Car>
+     */
+    public function getCars(): Collection
     {
         return $this->cars;
     }

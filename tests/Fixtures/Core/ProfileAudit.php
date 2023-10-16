@@ -11,36 +11,30 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace SimpleThings\EntityAudit\Tests\Fixtures\Core;
+namespace Sonata\EntityAuditBundle\Tests\Fixtures\Core;
 
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity
- */
+#[ORM\Entity]
 class ProfileAudit
 {
     /**
-     * @ORM\Id
-     * @ORM\Column(type="integer")
-     * @ORM\GeneratedValue
+     * @var int|null
      */
-    private $id;
+    #[ORM\Id]
+    #[ORM\Column(type: Types::INTEGER)]
+    #[ORM\GeneratedValue]
+    protected $id;
 
-    /**
-     * @ORM\Column(type="text")
-     */
-    private $biography;
+    #[ORM\OneToOne(targetEntity: UserAudit::class, inversedBy: 'profile')]
+    #[ORM\JoinColumn(referencedColumnName: 'id', nullable: true)]
+    private ?UserAudit $user = null;
 
-    /**
-     * @ORM\OneToOne(targetEntity="UserAudit", inversedBy="profile")
-     * @ORM\JoinColumn(referencedColumnName="id", nullable=true)
-     */
-    private $user;
-
-    public function __construct(string $biography)
-    {
-        $this->biography = $biography;
+    public function __construct(
+        #[ORM\Column(type: Types::TEXT)]
+        private string $biography
+    ) {
     }
 
     public function getId(): ?int

@@ -35,7 +35,7 @@ you using the latest patch version?
 
 GitHub Issues is for **issues**, as opposed to question on how to use Sonata.
 If you are not sure this is a bug, or simply want to ask such a question,
-please post your question on [Stack Overflow](http://stackoverflow.com/questions/tagged/sonata),
+please post your question on [Stack Overflow](https://stackoverflow.com/questions/tagged/sonata),
 using the `sonata` tags.
 
 If you happen to find a bug, we kindly request you report it. However,
@@ -79,11 +79,11 @@ But please, read the following before.
 
 #### Coding style
 
-Each project follows [PSR-1](http://www.php-fig.org/psr/psr-1/), [PSR-2](http://www.php-fig.org/psr/psr-2/)
-and [Symfony Coding Standards](http://symfony.com/doc/current/contributing/code/standards.html) for coding style,
-[PSR-4](http://www.php-fig.org/psr/psr-4/) for autoloading.
+Each project follows [PSR-1](https://www.php-fig.org/psr/psr-1/), [PSR-2](https://www.php-fig.org/psr/psr-2/)
+and [Symfony Coding Standards](https://symfony.com/doc/current/contributing/code/standards.html) for coding style,
+[PSR-4](https://www.php-fig.org/psr/psr-4/) for autoloading.
 
-Please [install PHP Coding Standard Fixer](http://cs.sensiolabs.org/#installation)
+Please [install PHP Coding Standard Fixer](https://cs.symfony.com/#installation)
 and run this command before committing your modifications:
 
 ```bash
@@ -94,19 +94,23 @@ Please note that we try to keep phpdoc to a minimum, so if an `@param` phpdoc
 comment brings nothing more than the type hint and variable name already do,
 it SHOULD be removed. Descriptions are OPTIONAL if you want to document a type.
 
-If you want to use pseudo-types, generics, array shapes or templates for
-static-analysis, prefer the usage of `@phpstan-` annotations over classic
-annotations to keep IDE support, and over `@psalm-` annotations for consistency.
-Keep standard annotations if necessary.
+If you want to use templates for static-analysis, prefer the usage of
+`@phpstan-` annotations over classic annotations to keep IDE support, and
+over `@psalm-` annotations for consistency. Keep standard annotations if necessary.
 
 ```php
 /**
- * @param Bar|Baz $foo
- * @param int     $limit a crucial, highly interesting comment
+ * @param Bar|Baz      $foo
+ * @param class-string $class
+ * @param int          $limit a crucial, fascinating comment
  *
- * @phpstan-param class-string $class
+ * @return object
+ *
+ * @phpstan-template T of object
+ * @phpstan-param class-string<T> $class
+ * @phpstan-return T
  */
-protected function bar($foo, string $class, int $limit)
+protected function bar($foo, string $class, int $limit): object
 {
     // ...
 }
@@ -203,24 +207,24 @@ Your note can be put on one of these sections:
 * `Fixed` for any bug fixes.
 * `Security` to invite users to upgrade in case of vulnerabilities.
 
-More information about the followed changelog format: [keepachangelog.com](http://keepachangelog.com/)
+More information about the followed changelog format: [keepachangelog.com](https://keepachangelog.com/)
 
 #### Base branch
 
 Before writing a PR, you have to check on which branch your changes SHOULD be based.
 
-Each project follows [semver](http://semver.org/) convention for release management.
+Each project follows [semver](https://semver.org/) convention for release management.
 
 Here is a short table resuming on which you have to start:
 
 Kind of modification | Backward Compatible (BC) | Type of release | Branch to target        | Label |
 -------------------- | ------------------------ | --------------- | ----------------------- | ----- |
 Bug fixes            | Yes                      | Patch           | `1.x`   |       |
-Bug fixes            | No (Only if no choice)   | Major           | `master` |       |
+Bug fixes            | No (Only if no choice)   | Major           | `2.x` |       |
 Feature              | Yes                      | Minor           | `1.x`   |       |
-Feature              | No (Only if no choice)   | Major           | `master` |       |
+Feature              | No (Only if no choice)   | Major           | `2.x` |       |
 Deprecation          | Yes (Have to)            | Minor           | `1.x`   |       |
-Deprecation removal  | No (Can't be)            | Major           | `master` |       |
+Deprecation removal  | No (Can't be)            | Major           | `2.x` |       |
 
 Notes:
   * Branch `1.x` is the branch of the **latest stable** minor release and
@@ -228,7 +232,7 @@ Notes:
   * If you PR is not **Backward Compatible** but can be, it **MUST** be:
     * Changing a function/method signature? Prefer create a new one and deprecate the old one.
     * Code deletion? Don't. Please deprecate it instead.
-    * If your BC PR is accepted, you can do a new one on the `master` branch which removes the deprecated code.
+    * If your BC PR is accepted, you can do a new one on the `2.x` branch which removes the deprecated code.
     * SYMFONY DOC REF (same logic)?
 
 If you have a non-BC PR to propose, please try to create a related BC PR first.
@@ -244,6 +248,9 @@ For instance, assuming you want to introduce a new method to an existing interfa
 
 namespace Foo;
 
+/**
+ * @method void usefulMethod()
+ */
 interface BarInterface
 {
   /**
@@ -251,7 +258,7 @@ interface BarInterface
    *
    * This method does useful stuff.
    */
-  // public function usefulMethod();
+  // public function usefulMethod(): void;
 
   // …
 }
@@ -322,7 +329,7 @@ If the deprecated thing is a service, you **MUST** specify it on the service def
  </service>
  ```
 
-More info: http://symfony.com/blog/new-in-symfony-2-8-deprecated-service-definitions
+More info: https://symfony.com/blog/new-in-symfony-2-8-deprecated-service-definitions
 
 For everything else, not managed by the `@deprecated` tag,
 you **MUST** still trigger a deprecation message (and add a `NEXT_MAJOR` comment).
@@ -358,8 +365,8 @@ If you want to change some dependencies, here are the rules:
 - Lower version dropping is accepted as a Backward Compatible change according to [semver][semver_dependencies_update],
 but some extra rules MUST be respected here:
   - PHP versions that are under the [orange zone][php_supported_versions] (Security Support) **MUST NOT** be dropped on the stable branch.
-  - PHP versions that are under the [green zone][php_supported_versions] (Active Support) **MUST NOT** be dropped on the master branch.
-  - If it's a Symfony package, at least the last LTS version **MUST** be supported, even on master.
+  - PHP versions that are under the [green zone][php_supported_versions] (Active Support) **MUST NOT** be dropped on the unstable branch.
+  - If it's a Symfony package, at least the last LTS version **MUST** be supported, even on the unstable branch.
   - Generally, don't drop dependency version if it doesn't have a big impact on the code.
   - Backward Compatible code related to the dropped version **MUST** be dropped on the same PR.
     This will allow seeing if this version drop **is really worth it** or not.

@@ -5,11 +5,16 @@
 name: Test
 
 on:
+    schedule:
+        - cron: '30 0 * * *'
     push:
         branches:
             - 1.x
-            - master
+            - 2.x
     pull_request:
+
+permissions:
+    contents: read
 
 jobs:
     test:
@@ -25,22 +30,37 @@ jobs:
         strategy:
             matrix:
                 php-version:
-                    - '7.3'
-                    - '7.4'
                     - '8.0'
+                    - '8.1'
+                    - '8.2'
                 dependencies: [highest]
                 allowed-to-fail: [false]
-                symfony-require: [""]
+                symfony-require: ['']
                 variant: [normal]
                 include:
-                    - php-version: '7.3'
+                    - php-version: '8.0'
                       dependencies: lowest
                       allowed-to-fail: false
                       variant: normal
+                    - php-version: '8.2'
+                      dependencies: highest
+                      allowed-to-fail: false
+                      symfony-require: 5.4.*
+                      variant: symfony/symfony:"5.4.*"
+                    - php-version: '8.2'
+                      dependencies: highest
+                      allowed-to-fail: false
+                      symfony-require: 6.2.*
+                      variant: symfony/symfony:"6.2.*"
+                    - php-version: '8.2'
+                      dependencies: highest
+                      allowed-to-fail: false
+                      symfony-require: 6.3.*
+                      variant: symfony/symfony:"6.3.*"
 
         steps:
             - name: Checkout
-              uses: actions/checkout@v2
+              uses: actions/checkout@v3
 
             - name: Install PHP with extensions
               uses: shivammathur/setup-php@v2
@@ -52,24 +72,25 @@ jobs:
             - name: Add PHPUnit matcher
               run: echo "::add-matcher::${{ runner.tool_cache }}/phpunit.json"
 
-            - name: "Globally install symfony/flex"
+            - name: Globally install symfony/flex
               if: matrix.symfony-require != ''
-              run: "composer global require --no-progress --no-scripts --no-plugins symfony/flex"
+              run: |
+                  composer global config --no-plugins allow-plugins.symfony/flex true
+                  composer global require --no-progress --no-scripts --no-plugins symfony/flex
 
             - name: Install variant
               if: matrix.variant != 'normal' && !startsWith(matrix.variant, 'symfony/symfony')
               run: composer require ${{ matrix.variant }} --no-update
 
-            - name: "Install Composer dependencies (${{ matrix.dependencies }})"
-              uses: "ramsey/composer-install@v1"
+            - name: Install Composer dependencies (${{ matrix.dependencies }})
+              uses: ramsey/composer-install@v2
               with:
-                  dependency-versions: "${{ matrix.dependencies }}"
-                  composer-options: "--prefer-dist --prefer-stable"
+                  dependency-versions: ${{ matrix.dependencies }}
 
-            - name: Run Tests
-              run: make test
+            - name: Run Tests with coverage
+              run: make coverage
 
             - name: Send coverage to Codecov
-              uses: codecov/codecov-action@v1
+              uses: codecov/codecov-action@v3
               with:
-                  file: build/logs/clover.xml
+                  files: build/logs/clover.xml

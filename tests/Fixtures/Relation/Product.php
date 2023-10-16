@@ -11,31 +11,27 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace SimpleThings\EntityAudit\Tests\Fixtures\Relation;
+namespace Sonata\EntityAuditBundle\Tests\Fixtures\Relation;
 
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity
- * @ORM\InheritanceType("JOINED")
- * @ORM\DiscriminatorColumn(name="discr", type="string")
- * @ORM\DiscriminatorMap({"cheese" = "CheeseProduct", "wine" = "WineProduct"})
- */
+#[ORM\Entity]
+#[ORM\InheritanceType('JOINED')]
+#[ORM\DiscriminatorColumn(name: 'discr', type: Types::STRING)]
+#[ORM\DiscriminatorMap(['cheese' => CheeseProduct::class, 'wine' => WineProduct::class])]
 abstract class Product extends SomeEntity
 {
     /**
-     * @ORM\Column(type="string")
+     * @var Category|null
      */
-    private $name;
+    #[ORM\ManyToOne(targetEntity: Category::class, inversedBy: 'products')]
+    protected $category;
 
-    /**
-     * @ORM\ManyToOne(targetEntity="Category", inversedBy="products")
-     */
-    private $category;
-
-    public function __construct(string $name)
-    {
-        $this->name = $name;
+    public function __construct(
+        #[ORM\Column(type: Types::STRING)]
+        protected string $name
+    ) {
     }
 
     public function setCategory(Category $category): void

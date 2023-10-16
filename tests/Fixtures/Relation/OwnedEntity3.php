@@ -11,36 +11,40 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace SimpleThings\EntityAudit\Tests\Fixtures\Relation;
+namespace Sonata\EntityAuditBundle\Tests\Fixtures\Relation;
 
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity
- */
+#[ORM\Entity]
 class OwnedEntity3
 {
     /**
-     * @ORM\Id
-     * @ORM\Column(type="integer", name="strange_owned_id_name")
-     * @ORM\GeneratedValue(strategy="AUTO")
+     * @var int|null
      */
+    #[ORM\Id]
+    #[ORM\Column(type: Types::INTEGER, name: 'strange_owned_id_name')]
+    #[ORM\GeneratedValue]
     protected $id;
 
     /**
-     * @ORM\Column(type="string", name="even_strangier_column_name")
+     * @var string|null
      */
+    #[ORM\Column(type: Types::STRING, name: 'even_strangier_column_name')]
     protected $title;
 
     /**
-     * @ORM\ManyToMany(targetEntity="OwnerEntity", inversedBy="owned3")
-     * @ORM\JoinTable(
-     *     name="owner_owned3",
-     *     joinColumns={@ORM\JoinColumn(name="owned3_id", referencedColumnName="strange_owned_id_name")},
-     *     inverseJoinColumns={@ORM\JoinColumn(name="owner_id", referencedColumnName="some_strange_key_name")}
-     * )
+     * @var Collection<int, OwnerEntity>
      */
-    protected $owner;
+    #[ORM\ManyToMany(targetEntity: OwnerEntity::class, mappedBy: 'owned3')]
+    protected $owners;
+
+    public function __construct()
+    {
+        $this->owners = new ArrayCollection();
+    }
 
     public function getId(): ?int
     {
@@ -57,13 +61,16 @@ class OwnedEntity3
         $this->title = $title;
     }
 
-    public function getOwner(): ?OwnerEntity
+    /**
+     * @return Collection<int, OwnerEntity>
+     */
+    public function getOwners(): Collection
     {
-        return $this->owner;
+        return $this->owners;
     }
 
-    public function setOwner(?OwnerEntity $owner): void
+    public function addOwner(OwnerEntity $owner): void
     {
-        $this->owner = $owner;
+        $this->owners[] = $owner;
     }
 }

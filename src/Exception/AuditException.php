@@ -21,22 +21,23 @@ abstract class AuditException extends \Exception
     protected $className;
 
     /**
-     * @var array|null
+     * @var array<int|string>|null
      */
     protected $id;
 
     /**
-     * @var int|string|null
+     * @param array<int|string>|null $id
+     * @param int|string|null        $revision
      */
-    protected $revision;
+    public function __construct(
+        ?string $className,
+        ?array $id,
+        protected $revision,
+        string $message = ''
+    ) {
+        parent::__construct($message);
 
-    /**
-     * @param int|string|null $revision
-     */
-    public function __construct(?string $className, ?array $id, $revision)
-    {
         $this->className = $className;
         $this->id = $id;
-        $this->revision = $revision;
     }
 }

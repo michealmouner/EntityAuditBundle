@@ -11,24 +11,24 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace SimpleThings\EntityAudit\Tests\Fixtures\Relation;
+namespace Sonata\EntityAuditBundle\Tests\Fixtures\Relation;
 
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity
- * @ORM\InheritanceType("JOINED")
- * @ORM\DiscriminatorColumn(name="discr", type="string")
- * @ORM\DiscriminatorMap({"food" = "FoodCategory", "books" = "BookCategory"})
- */
+#[ORM\Entity]
+#[ORM\InheritanceType('JOINED')]
+#[ORM\DiscriminatorColumn(name: 'discr', type: Types::STRING)]
+#[ORM\DiscriminatorMap(['food' => FoodCategory::class, 'books' => BookCategory::class])]
 abstract class Category extends SomeEntity
 {
     /**
-     * @ORM\OneToMany(targetEntity="Product", mappedBy="category")
+     * @var Collection<int, Product>
      */
-    private $products;
+    #[ORM\OneToMany(targetEntity: Product::class, mappedBy: 'category')]
+    private Collection $products;
 
     public function __construct()
     {
@@ -41,6 +41,9 @@ abstract class Category extends SomeEntity
         $this->products->add($product);
     }
 
+    /**
+     * @return Collection<int, Product>
+     */
     public function getProducts(): Collection
     {
         return $this->products;

@@ -11,7 +11,7 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace SimpleThings\EntityAudit\Tests\Utils;
+namespace Sonata\EntityAuditBundle\Tests\Utils;
 
 use PHPUnit\Framework\TestCase;
 use SimpleThings\EntityAudit\Utils\SimpleDiff;
@@ -19,24 +19,25 @@ use SimpleThings\EntityAudit\Utils\SimpleDiff;
 final class SimpleDiffTest extends TestCase
 {
     /**
-     * @dataProvider dataDiff
+     * @dataProvider provideDiffCases
      */
     public function testDiff(string $old, string $new, string $output): void
     {
         $diff = new SimpleDiff();
         $d = $diff->htmlDiff($old, $new);
 
-        $this->assertSame($output, $d);
+        static::assertSame($output, $d);
     }
 
-    public static function dataDiff(): iterable
+    /**
+     * @return iterable<array{string, string, string}>
+     */
+    public static function provideDiffCases(): iterable
     {
-        return [
-            ['Foo', 'foo', '<del>Foo</del> <ins>foo</ins> '],
-            ['Foo Foo', 'Foo', 'Foo <del>Foo</del> '],
-            ['Foo', 'Foo Foo', 'Foo <ins>Foo</ins> '],
-            ['Foo Bar Baz', 'Foo Foo Foo', 'Foo <del>Bar Baz</del> <ins>Foo Foo</ins> '],
-            ['Foo Bar Baz', 'Foo Baz', 'Foo <del>Bar</del> Baz '],
-        ];
+        yield ['Foo', 'foo', '<del>Foo</del> <ins>foo</ins> '];
+        yield ['Foo Foo', 'Foo', 'Foo <del>Foo</del> '];
+        yield ['Foo', 'Foo Foo', 'Foo <ins>Foo</ins> '];
+        yield ['Foo Bar Baz', 'Foo Foo Foo', 'Foo <del>Bar Baz</del> <ins>Foo Foo</ins> '];
+        yield ['Foo Bar Baz', 'Foo Baz', 'Foo <del>Bar</del> Baz '];
     }
 }

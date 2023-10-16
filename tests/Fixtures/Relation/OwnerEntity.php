@@ -11,45 +11,58 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace SimpleThings\EntityAudit\Tests\Fixtures\Relation;
+namespace Sonata\EntityAuditBundle\Tests\Fixtures\Relation;
 
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity
- */
+#[ORM\Entity]
 class OwnerEntity
 {
-    /**
-     * @ORM\Id
-     * @ORM\Column(type="integer", name="some_strange_key_name")
-     * @ORM\GeneratedValue(strategy="AUTO")
-     */
-    protected $id;
+    #[ORM\Id]
+    #[ORM\Column(type: Types::INTEGER, name: 'some_strange_key_name')]
+    #[ORM\GeneratedValue]
+    protected ?int $id = null;
+
+    #[ORM\Column(type: Types::STRING, name: 'crazy_title_to_mess_up_audit')]
+    protected ?string $title = null;
 
     /**
-     * @ORM\Column(type="string", name="crazy_title_to_mess_up_audit")
+     * @var Collection<int, OwnedEntity1>
      */
-    protected $title;
+    #[ORM\OneToMany(targetEntity: OwnedEntity1::class, mappedBy: 'owner')]
+    protected Collection $owned1;
 
     /**
-     * @ORM\OneToMany(targetEntity="OwnedEntity1", mappedBy="owner")
+     * @var Collection<int, OwnedEntity2>
      */
-    protected $owned1;
+    #[ORM\OneToMany(targetEntity: OwnedEntity2::class, mappedBy: 'owner')]
+    protected Collection $owned2;
 
     /**
-     * @ORM\OneToMany(targetEntity="OwnedEntity2", mappedBy="owner")
+     * @var Collection<int, OwnedEntity3>
      */
-    protected $owned2;
+    #[ORM\ManyToMany(targetEntity: OwnedEntity3::class, inversedBy: 'owner')]
+    #[ORM\JoinTable(name: 'owner_owned3')]
+    #[ORM\JoinColumn(name: 'owner_id', referencedColumnName: 'some_strange_key_name')]
+    #[ORM\InverseJoinColumn(name: 'owned3_id', referencedColumnName: 'strange_owned_id_name')]
+    protected Collection $owned3;
 
     /**
-     * @ORM\ManyToMany(targetEntity="OwnedEntity3", mappedBy="owner")
-     * @ORM\JoinTable(name="owner_owned3",
-     *   joinColumns={@ORM\JoinColumn(name="owned3_id", referencedColumnName="strange_owned_id_name")},
-     *   inverseJoinColumns={@ORM\JoinColumn(name="owner_id", referencedColumnName="some_strange_key_name")}
-     * )
+     * @var Collection<int, OwnedEntity4>
      */
-    protected $owned3;
+    #[ORM\ManyToMany(targetEntity: OwnedEntity4::class, mappedBy: 'owners')]
+    protected Collection $ownedInverse;
+
+    public function __construct()
+    {
+        $this->owned1 = new ArrayCollection();
+        $this->owned2 = new ArrayCollection();
+        $this->owned3 = new ArrayCollection();
+        $this->ownedInverse = new ArrayCollection();
+    }
 
     public function getId(): ?int
     {
@@ -66,6 +79,9 @@ class OwnerEntity
         $this->title = $title;
     }
 
+    /**
+     * @return Collection<int, OwnedEntity1>
+     */
     public function getOwned1()
     {
         return $this->owned1;
@@ -76,6 +92,9 @@ class OwnerEntity
         $this->owned1[] = $owned1;
     }
 
+    /**
+     * @return Collection<int, OwnedEntity2>
+     */
     public function getOwned2()
     {
         return $this->owned2;
@@ -86,7 +105,10 @@ class OwnerEntity
         $this->owned2[] = $owned2;
     }
 
-    public function getOwned3()
+    /**
+     * @return Collection<int, OwnedEntity3>
+     */
+    public function getOwned3(): Collection
     {
         return $this->owned3;
     }
@@ -94,5 +116,18 @@ class OwnerEntity
     public function addOwned3(OwnedEntity3 $owned3): void
     {
         $this->owned3[] = $owned3;
+    }
+
+    /**
+     * @return Collection<int, OwnedEntity4>
+     */
+    public function getOwnedInverse(): Collection
+    {
+        return $this->ownedInverse;
+    }
+
+    public function addOwnedInverse(OwnedEntity4 $ownedInverse): void
+    {
+        $this->ownedInverse[] = $ownedInverse;
     }
 }

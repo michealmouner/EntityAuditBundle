@@ -11,35 +11,24 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace SimpleThings\EntityAudit\Tests\Fixtures\Relation;
+namespace Sonata\EntityAuditBundle\Tests\Fixtures\Relation;
 
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * Abstract data entity.
- *
- * @ORM\Entity
- * @ORM\InheritanceType("SINGLE_TABLE")
- * @ORM\DiscriminatorColumn(name="type", type="string")
- * @ORM\DiscriminatorMap({"private" = "DataPrivateEntity", "legal" = "DataLegalEntity"})
- */
+#[ORM\Entity]
+#[ORM\InheritanceType('SINGLE_TABLE')]
+#[ORM\DiscriminatorColumn(name: 'type', type: Types::STRING)]
+#[ORM\DiscriminatorMap(['private' => DataPrivateEntity::class, 'legal' => DataLegalEntity::class])]
 abstract class AbstractDataEntity
 {
-    /**
-     * @var int
-     *
-     * @ORM\Column(type="integer")
-     * @ORM\Id
-     * @ORM\GeneratedValue(strategy="AUTO")
-     */
-    private $id;
+    #[ORM\Column(type: Types::INTEGER)]
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    protected ?int $id = null;
 
-    /**
-     * @var DataContainerEntity
-     *
-     * @ORM\OneToOne(targetEntity="DataContainerEntity", mappedBy="data")
-     */
-    private $dataContainer;
+    #[ORM\OneToOne(targetEntity: DataContainerEntity::class, mappedBy: 'data')]
+    private ?DataContainerEntity $dataContainer = null;
 
     public function getId(): ?int
     {
@@ -51,7 +40,7 @@ abstract class AbstractDataEntity
         return $this->dataContainer;
     }
 
-    public function setDataContainer(DataContainerEntity $dataContainer)
+    public function setDataContainer(DataContainerEntity $dataContainer): void
     {
         $this->dataContainer = $dataContainer;
     }

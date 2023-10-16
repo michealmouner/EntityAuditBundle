@@ -11,35 +11,28 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace SimpleThings\EntityAudit\Tests\Fixtures\Issue;
+namespace Sonata\EntityAuditBundle\Tests\Fixtures\Issue;
 
 use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * Class Issue156Contact.
- *
- * @ORM\Entity()
- * @ORM\InheritanceType("SINGLE_TABLE")
- * @ORM\DiscriminatorColumn(name="discriminator", type="string")
- */
+#[ORM\Entity]
+#[ORM\InheritanceType('SINGLE_TABLE')]
+#[ORM\DiscriminatorColumn(name: 'discriminator', type: Types::STRING)]
 class Issue156Contact
 {
-    /**
-     * @var int
-     *
-     * @ORM\Id
-     * @ORM\Column(type="integer")
-     * @ORM\GeneratedValue(strategy="AUTO")
-     */
-    private $id;
+    #[ORM\Id]
+    #[ORM\Column(type: Types::INTEGER)]
+    #[ORM\GeneratedValue]
+    protected ?int $id = null;
 
     /**
-     * @var ArrayCollection|Issue156ContactTelephoneNumber[]
-     *
-     * @ORM\OneToMany(targetEntity="Issue156ContactTelephoneNumber", mappedBy="contact")
+     * @var Collection<int, Issue156ContactTelephoneNumber>
      */
-    private $telephoneNumbers;
+    #[ORM\OneToMany(targetEntity: Issue156ContactTelephoneNumber::class, mappedBy: 'contact')]
+    private Collection $telephoneNumbers;
 
     public function __construct()
     {
@@ -69,7 +62,7 @@ class Issue156Contact
     }
 
     /**
-     * @return ArrayCollection|Issue156ContactTelephoneNumber[]
+     * @return iterable<int, Issue156ContactTelephoneNumber>
      */
     public function getTelephoneNumbers(): iterable
     {

@@ -11,45 +11,41 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace SimpleThings\EntityAudit\Tests\Fixtures\Issue;
+namespace Sonata\EntityAuditBundle\Tests\Fixtures\Issue;
 
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity
- */
+#[ORM\Entity]
 class Issue9Address
 {
     /**
-     * @ORM\Id
-     * @ORM\Column(type="integer")
-     * @ORM\GeneratedValue(strategy="AUTO")
+     * @var int|null
      */
-    private $id;
+    #[ORM\Id]
+    #[ORM\Column(type: Types::INTEGER)]
+    #[ORM\GeneratedValue]
+    protected $id;
 
-    /**
-     * @ORM\Column
-     */
-    private $address_text;
+    #[ORM\Column]
+    private ?string $addressText = null;
 
-    /**
-     * @ORM\ManyToOne(targetEntity="Issue9Customer", inversedBy="addresses")
-     */
-    private $customer;
+    #[ORM\ManyToOne(targetEntity: Issue9Customer::class, inversedBy: 'addresses')]
+    private ?Issue9Customer $customer = null;
 
     public function getId(): ?int
     {
         return $this->id;
     }
 
-    public function getAddressText()
+    public function getAddressText(): ?string
     {
-        return $this->address_text;
+        return $this->addressText;
     }
 
-    public function setAddressText($address_text): void
+    public function setAddressText(?string $addressText): void
     {
-        $this->address_text = $address_text;
+        $this->addressText = $addressText;
     }
 
     public function getCustomer(): ?Issue9Customer

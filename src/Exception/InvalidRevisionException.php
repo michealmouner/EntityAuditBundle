@@ -15,10 +15,11 @@ namespace SimpleThings\EntityAudit\Exception;
 
 class InvalidRevisionException extends AuditException
 {
+    /**
+     * @param int|string $revision
+     */
     public function __construct($revision)
     {
-        parent::__construct(null, null, $revision);
-
-        $this->message = sprintf('No revision "%s" exists.', $revision);
+        parent::__construct(null, null, $revision, sprintf('No revision "%s" exists.', $revision));
     }
 }

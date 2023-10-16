@@ -11,55 +11,51 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace SimpleThings\EntityAudit\Tests\Fixtures\Issue;
+namespace Sonata\EntityAuditBundle\Tests\Fixtures\Issue;
 
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Gedmo\Mapping\Annotation as Gedmo;
 
-/**
- * @ORM\Entity
- * @Gedmo\SoftDeleteable(fieldName="deletedAt")
- */
+#[ORM\Entity]
+#[Gedmo\SoftDeleteable(fieldName: 'deletedAt')]
 class Issue111Entity
 {
     /**
-     * @ORM\Id
-     * @ORM\Column(type="integer")
-     * @ORM\GeneratedValue(strategy="AUTO")
+     * @var int|null
      */
-    private $id;
+    #[ORM\Id]
+    #[ORM\Column(type: Types::INTEGER)]
+    #[ORM\GeneratedValue]
+    protected $id;
 
-    /**
-     * @ORM\Column
-     */
-    private $status;
+    #[ORM\Column]
+    private ?string $status = null;
 
-    /**
-     * @ORM\Column(type="datetime", nullable=true, name="deleted_at")
-     */
-    private $deletedAt;
+    #[ORM\Column(type: Types::DATETIME_MUTABLE, nullable: true, name: 'deleted_at')]
+    private ?\DateTimeInterface $deletedAt = null;
 
     public function getId(): ?int
     {
         return $this->id;
     }
 
-    public function getStatus()
+    public function getStatus(): ?string
     {
         return $this->status;
     }
 
-    public function setStatus($status): void
+    public function setStatus(?string $status): void
     {
         $this->status = $status;
     }
 
-    public function getDeletedAt(): \DateTimeInterface
+    public function getDeletedAt(): ?\DateTimeInterface
     {
         return $this->deletedAt;
     }
 
-    public function setDeletedAt(\DateTimeInterface $deletedAt): void
+    public function setDeletedAt(?\DateTimeInterface $deletedAt = null): void
     {
         $this->deletedAt = $deletedAt;
     }

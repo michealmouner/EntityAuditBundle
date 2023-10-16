@@ -11,26 +11,27 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace SimpleThings\EntityAudit\Tests\Fixtures\Relation;
+namespace Sonata\EntityAuditBundle\Tests\Fixtures\Relation;
 
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity
- * @ORM\InheritanceType("JOINED")
- * @ORM\DiscriminatorColumn(name="discr", type="string")
- * @ORM\DiscriminatorMap({ "foobar" = "RelationFoobarEntity" })
- */
+#[ORM\Entity]
+#[ORM\InheritanceType('JOINED')]
+#[ORM\DiscriminatorColumn(name: 'discr', type: Types::STRING)]
+#[ORM\DiscriminatorMap(['foobar' => RelationFoobarEntity::class])]
 abstract class RelationReferencedEntity extends RelationAbstractEntityBase
 {
     /**
-     * @ORM\Column(type="string")
+     * @var string|null
      */
+    #[ORM\Column(type: Types::STRING)]
     protected $referencedField;
 
     /**
-     * @ORM\OneToOne(targetEntity="RelationOneToOneEntity", mappedBy="referencedEntity")
+     * @var RelationOneToOneEntity|null
      */
+    #[ORM\OneToOne(targetEntity: RelationOneToOneEntity::class, mappedBy: 'referencedEntity')]
     protected $oneToOne;
 
     public function getOneToOne(): ?RelationOneToOneEntity

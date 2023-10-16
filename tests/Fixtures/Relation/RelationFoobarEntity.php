@@ -11,18 +11,18 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace SimpleThings\EntityAudit\Tests\Fixtures\Relation;
+namespace Sonata\EntityAuditBundle\Tests\Fixtures\Relation;
 
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity
- */
+#[ORM\Entity]
 class RelationFoobarEntity extends RelationReferencedEntity
 {
     /**
-     * @ORM\Column(type="string")
+     * @var string|null
      */
+    #[ORM\Column(type: Types::STRING)]
     protected $foobarField;
 
     public function getFoobarField(): ?string

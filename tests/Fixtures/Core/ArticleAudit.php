@@ -11,48 +11,32 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace SimpleThings\EntityAudit\Tests\Fixtures\Core;
+namespace Sonata\EntityAuditBundle\Tests\Fixtures\Core;
 
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity
- */
+#[ORM\Entity]
 class ArticleAudit
 {
     /**
-     * @ORM\Id
-     * @ORM\Column(type="integer")
-     * @ORM\GeneratedValue
+     * @var int|null
      */
-    private $id;
+    #[ORM\Id]
+    #[ORM\Column(type: Types::INTEGER)]
+    #[ORM\GeneratedValue]
+    protected $id;
 
-    /**
-     * @ORM\Column(type="string", name="my_title_column")
-     */
-    private $title;
-
-    /**
-     * @ORM\Column(type="text")
-     */
-    private $text;
-
-    /**
-     * @ORM\Column(type="text")
-     */
-    private $ignoreme;
-
-    /**
-     * @ORM\ManyToOne(targetEntity="UserAudit")
-     */
-    private $author;
-
-    public function __construct(string $title, string $text, UserAudit $author, string $ignoreme)
-    {
-        $this->title = $title;
-        $this->text = $text;
-        $this->author = $author;
-        $this->ignoreme = $ignoreme;
+    public function __construct(
+        #[ORM\Column(type: Types::STRING, name: 'my_title_column')]
+        protected string $title,
+        #[ORM\Column(type: Types::TEXT)]
+        protected string $text,
+        #[ORM\ManyToOne(targetEntity: UserAudit::class)]
+        private ?UserAudit $author,
+        #[ORM\Column(type: Types::TEXT)]
+        protected string $ignoreme
+    ) {
     }
 
     public function getId(): ?int

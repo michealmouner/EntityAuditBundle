@@ -14,7 +14,7 @@ allows full versioning of entities and their associations.
 Branch | Github Actions | Code Coverage |
 ------ | -------------- | ------------- |
 1.x    | [![Test][test_stable_badge]][test_stable_link]     | [![Coverage Status][coverage_stable_badge]][coverage_stable_link]     |
-master | [![Test][test_unstable_badge]][test_unstable_link] | [![Coverage Status][coverage_unstable_badge]][coverage_unstable_link] |
+2.x.   | [![Test][test_unstable_badge]][test_unstable_link] | [![Coverage Status][coverage_unstable_badge]][coverage_unstable_link] |
 
 ## Support
 
@@ -29,13 +29,13 @@ This package is available under the [LGPL license](LICENSE).
 
 [test_stable_badge]: https://github.com/sonata-project/EntityAuditBundle/workflows/Test/badge.svg?branch=1.x
 [test_stable_link]: https://github.com/sonata-project/EntityAuditBundle/actions?query=workflow:test+branch:1.x
-[test_unstable_badge]: https://github.com/sonata-project/EntityAuditBundle/workflows/Test/badge.svg?branch=master
-[test_unstable_link]: https://github.com/sonata-project/EntityAuditBundle/actions?query=workflow:test+branch:master
+[test_unstable_badge]: https://github.com/sonata-project/EntityAuditBundle/workflows/Test/badge.svg?branch=2.x
+[test_unstable_link]: https://github.com/sonata-project/EntityAuditBundle/actions?query=workflow:test+branch:2.x
 
 [coverage_stable_badge]: https://codecov.io/gh/sonata-project/EntityAuditBundle/branch/1.x/graph/badge.svg
 [coverage_stable_link]: https://codecov.io/gh/sonata-project/EntityAuditBundle/branch/1.x
-[coverage_unstable_badge]: https://codecov.io/gh/sonata-project/EntityAuditBundle/branch/master/graph/badge.svg
-[coverage_unstable_link]: https://codecov.io/gh/sonata-project/EntityAuditBundle/branch/master
+[coverage_unstable_badge]: https://codecov.io/gh/sonata-project/EntityAuditBundle/branch/2.x/graph/badge.svg
+[coverage_unstable_link]: https://codecov.io/gh/sonata-project/EntityAuditBundle/branch/2.x
 
 ## How does it work?
 
@@ -108,6 +108,12 @@ In order to work with other connection or entity manager than "default", use the
 simple_things_entity_audit:
     connection: custom
     entity_manager: custom
+```
+
+If you need to explicitly discard the foreign keys inferred from the audited entities, you can use the `disable_foreign_keys` parameter:
+```yaml
+simple_things_entity_audit:
+    disable_foreign_keys: true
 ```
 
 ### Creating new tables
@@ -286,4 +292,3 @@ This provides you with a few different routes:
 * Currently only works with auto-increment databases
 * Proper metadata mapping is necessary, allow to disable versioning for fields and associations.
 * It does NOT work with Joined-Table-Inheritance (Single Table Inheritance should work, but not tested)
-* Many-To-Many associations are NOT versioned

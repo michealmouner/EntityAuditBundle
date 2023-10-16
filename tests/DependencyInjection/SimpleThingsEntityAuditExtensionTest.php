@@ -11,11 +11,19 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace SimpleThings\EntityAudit\Tests\DependencyInjection;
+namespace Sonata\EntityAuditBundle\Tests\DependencyInjection;
 
 use Doctrine\DBAL\Types\Types;
+use Doctrine\ORM\Events;
+use Doctrine\ORM\Tools\ToolEvents;
 use Matthias\SymfonyDependencyInjectionTest\PhpUnit\AbstractExtensionTestCase;
+use SimpleThings\EntityAudit\AuditConfiguration;
+use SimpleThings\EntityAudit\AuditManager;
+use SimpleThings\EntityAudit\AuditReader;
 use SimpleThings\EntityAudit\DependencyInjection\SimpleThingsEntityAuditExtension;
+use SimpleThings\EntityAudit\EventListener\CreateSchemaListener;
+use SimpleThings\EntityAudit\EventListener\LogRevisionsListener;
+use SimpleThings\EntityAudit\User\TokenStorageUsernameCallable;
 
 final class SimpleThingsEntityAuditExtensionTest extends AbstractExtensionTestCase
 {
@@ -23,24 +31,28 @@ final class SimpleThingsEntityAuditExtensionTest extends AbstractExtensionTestCa
     {
         $this->load([]);
 
-        $this->assertContainerBuilderHasService('simplethings_entityaudit.manager', 'SimpleThings\EntityAudit\AuditManager');
+        $this->assertContainerBuilderHasService('simplethings_entityaudit.manager', AuditManager::class);
         $this->assertContainerBuilderHasServiceDefinitionWithArgument('simplethings_entityaudit.manager', 0, 'simplethings_entityaudit.config');
 
-        $this->assertContainerBuilderHasService('simplethings_entityaudit.reader', 'SimpleThings\EntityAudit\AuditReader');
+        $this->assertContainerBuilderHasService('simplethings_entityaudit.reader', AuditReader::class);
         $this->assertContainerBuilderHasServiceDefinitionWithArgument('simplethings_entityaudit.reader', 0);
 
-        $this->assertContainerBuilderHasService('simplethings_entityaudit.log_revisions_listener', 'SimpleThings\EntityAudit\EventListener\LogRevisionsListener');
+        $this->assertContainerBuilderHasService('simplethings_entityaudit.log_revisions_listener', LogRevisionsListener::class);
         $this->assertContainerBuilderHasServiceDefinitionWithArgument('simplethings_entityaudit.log_revisions_listener', 0, 'simplethings_entityaudit.manager');
-        $this->assertContainerBuilderHasServiceDefinitionWithTag('simplethings_entityaudit.log_revisions_listener', 'doctrine.event_subscriber', ['connection' => 'default']);
 
-        $this->assertContainerBuilderHasService('simplethings_entityaudit.create_schema_listener', 'SimpleThings\EntityAudit\EventListener\CreateSchemaListener');
+        foreach ([Events::onFlush, Events::postPersist, Events::postUpdate, Events::postFlush, Events::onClear] as $event) {
+            $this->assertContainerBuilderHasServiceDefinitionWithTag('simplethings_entityaudit.log_revisions_listener', 'doctrine.event_listener', ['event' => $event, 'connection' => 'default']);
+        }
+        $this->assertContainerBuilderHasService('simplethings_entityaudit.create_schema_listener', CreateSchemaListener::class);
         $this->assertContainerBuilderHasServiceDefinitionWithArgument('simplethings_entityaudit.create_schema_listener', 0, 'simplethings_entityaudit.manager');
-        $this->assertContainerBuilderHasServiceDefinitionWithTag('simplethings_entityaudit.create_schema_listener', 'doctrine.event_subscriber', ['connection' => 'default']);
+        foreach ([ToolEvents::postGenerateSchemaTable, ToolEvents::postGenerateSchema] as $event) {
+            $this->assertContainerBuilderHasServiceDefinitionWithTag('simplethings_entityaudit.create_schema_listener', 'doctrine.event_listener', ['event' => $event, 'connection' => 'default']);
+        }
 
-        $this->assertContainerBuilderHasService('simplethings_entityaudit.username_callable.token_storage', 'SimpleThings\EntityAudit\User\TokenStorageUsernameCallable');
-        $this->assertContainerBuilderHasServiceDefinitionWithArgument('simplethings_entityaudit.username_callable.token_storage', 0, 'service_container');
+        $this->assertContainerBuilderHasService('simplethings_entityaudit.username_callable.token_storage', TokenStorageUsernameCallable::class);
+        $this->assertContainerBuilderHasServiceDefinitionWithArgument('simplethings_entityaudit.username_callable.token_storage', 0, 'security.token_storage');
 
-        $this->assertContainerBuilderHasService('simplethings_entityaudit.config', 'SimpleThings\EntityAudit\AuditConfiguration');
+        $this->assertContainerBuilderHasService('simplethings_entityaudit.config', AuditConfiguration::class);
         $this->assertContainerBuilderHasServiceDefinitionWithMethodCall('simplethings_entityaudit.config', 'setAuditedEntityClasses', ['%simplethings.entityaudit.audited_entities%']);
         $this->assertContainerBuilderHasServiceDefinitionWithMethodCall('simplethings_entityaudit.config', 'setGlobalIgnoreColumns', ['%simplethings.entityaudit.global_ignore_columns%']);
         $this->assertContainerBuilderHasServiceDefinitionWithMethodCall('simplethings_entityaudit.config', 'setTablePrefix', ['%simplethings.entityaudit.table_prefix%']);
@@ -49,6 +61,7 @@ final class SimpleThingsEntityAuditExtensionTest extends AbstractExtensionTestCa
         $this->assertContainerBuilderHasServiceDefinitionWithMethodCall('simplethings_entityaudit.config', 'setRevisionIdFieldType', ['%simplethings.entityaudit.revision_id_field_type%']);
         $this->assertContainerBuilderHasServiceDefinitionWithMethodCall('simplethings_entityaudit.config', 'setRevisionFieldName', ['%simplethings.entityaudit.revision_field_name%']);
         $this->assertContainerBuilderHasServiceDefinitionWithMethodCall('simplethings_entityaudit.config', 'setRevisionTypeFieldName', ['%simplethings.entityaudit.revision_type_field_name%']);
+        $this->assertContainerBuilderHasServiceDefinitionWithMethodCall('simplethings_entityaudit.config', 'setDisabledForeignKeys', ['%simplethings.entityaudit.disable_foreign_keys%']);
         $this->assertContainerBuilderHasServiceDefinitionWithMethodCall('simplethings_entityaudit.config', 'setUsernameCallable', ['simplethings_entityaudit.username_callable']);
     }
 
@@ -90,6 +103,7 @@ final class SimpleThingsEntityAuditExtensionTest extends AbstractExtensionTestCa
         $this->assertContainerBuilderHasParameter('simplethings.entityaudit.revision_field_name', 'rev');
         $this->assertContainerBuilderHasParameter('simplethings.entityaudit.revision_type_field_name', 'revtype');
         $this->assertContainerBuilderHasParameter('simplethings.entityaudit.revision_id_field_type', Types::INTEGER);
+        $this->assertContainerBuilderHasParameter('simplethings.entityaudit.disable_foreign_keys', false);
     }
 
     public function testItSetsConfiguredParameters(): void
@@ -105,6 +119,7 @@ final class SimpleThingsEntityAuditExtensionTest extends AbstractExtensionTestCa
             'revision_id_field_type' => Types::GUID,
             'revision_field_name' => 'revision',
             'revision_type_field_name' => 'action',
+            'disable_foreign_keys' => false,
         ]);
 
         $this->assertContainerBuilderHasParameter('simplethings.entityaudit.connection', 'my_custom_connection');
@@ -117,9 +132,14 @@ final class SimpleThingsEntityAuditExtensionTest extends AbstractExtensionTestCa
         $this->assertContainerBuilderHasParameter('simplethings.entityaudit.revision_id_field_type', Types::GUID);
         $this->assertContainerBuilderHasParameter('simplethings.entityaudit.revision_field_name', 'revision');
         $this->assertContainerBuilderHasParameter('simplethings.entityaudit.revision_type_field_name', 'action');
+        $this->assertContainerBuilderHasParameter('simplethings.entityaudit.disable_foreign_keys', false);
 
-        $this->assertContainerBuilderHasServiceDefinitionWithTag('simplethings_entityaudit.log_revisions_listener', 'doctrine.event_subscriber', ['connection' => 'my_custom_connection']);
-        $this->assertContainerBuilderHasServiceDefinitionWithTag('simplethings_entityaudit.create_schema_listener', 'doctrine.event_subscriber', ['connection' => 'my_custom_connection']);
+        foreach ([Events::onFlush, Events::postPersist, Events::postUpdate, Events::postFlush, Events::onClear] as $event) {
+            $this->assertContainerBuilderHasServiceDefinitionWithTag('simplethings_entityaudit.log_revisions_listener', 'doctrine.event_listener', ['event' => $event, 'connection' => 'my_custom_connection']);
+        }
+        foreach ([ToolEvents::postGenerateSchemaTable, ToolEvents::postGenerateSchema] as $event) {
+            $this->assertContainerBuilderHasServiceDefinitionWithTag('simplethings_entityaudit.create_schema_listener', 'doctrine.event_listener', ['event' => $event, 'connection' => 'my_custom_connection']);
+        }
     }
 
     protected function getContainerExtensions(): array

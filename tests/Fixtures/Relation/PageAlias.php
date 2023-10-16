@@ -11,38 +11,25 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace SimpleThings\EntityAudit\Tests\Fixtures\Relation;
+namespace Sonata\EntityAuditBundle\Tests\Fixtures\Relation;
 
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
 /**
  * A slightly contrived entity which has an entity (Page) as an ID.
- *
- * @ORM\Entity
  */
+#[ORM\Entity]
 class PageAlias
 {
-    /**
-     * @ORM\ManyToOne(targetEntity="Page", inversedBy="associatedEmails", cascade={"persist"})
-     * @ORM\JoinColumn(name="page_id", referencedColumnName="id", nullable=false)
-     * @ORM\Id
-     *
-     * @var Page
-     */
-    protected $page;
-
-    /**
-     * @var string
-     *
-     * @ORM\Column( type="string", nullable=false, length=255, unique=true)
-     * )
-     */
-    protected $alias;
-
-    public function __construct(Page $page, ?string $alias = null)
-    {
-        $this->page = $page;
-        $this->alias = $alias;
+    public function __construct(
+        #[ORM\Id]
+        #[ORM\ManyToOne(targetEntity: Page::class, inversedBy: 'associatedEmails', cascade: ['persist'])]
+        #[ORM\JoinColumn(name: 'page_id', referencedColumnName: 'id', nullable: false)]
+        protected Page $page,
+        #[ORM\Column(type: Types::STRING, nullable: false, length: 255, unique: true)]
+        protected ?string $alias = null
+    ) {
     }
 
     public function getAlias(): ?string

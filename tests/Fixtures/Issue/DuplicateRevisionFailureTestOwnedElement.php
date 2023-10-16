@@ -11,24 +11,24 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace SimpleThings\EntityAudit\Tests\Fixtures\Issue;
+namespace Sonata\EntityAuditBundle\Tests\Fixtures\Issue;
 
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity
- */
+#[ORM\Entity]
 class DuplicateRevisionFailureTestOwnedElement extends DuplicateRevisionFailureTestEntity
 {
     /**
-     * @ORM\ManyToOne(targetEntity="DuplicateRevisionFailureTestPrimaryOwner", inversedBy="elements")
+     * @var DuplicateRevisionFailureTestPrimaryOwner|null
      */
-    private $primaryOwner;
+    #[ORM\ManyToOne(targetEntity: DuplicateRevisionFailureTestPrimaryOwner::class, inversedBy: 'elements')]
+    protected $primaryOwner;
 
     /**
-     * @ORM\ManyToOne(targetEntity="DuplicateRevisionFailureTestSecondaryOwner", inversedBy="elements")
+     * @var DuplicateRevisionFailureTestSecondaryOwner|null
      */
-    private $secondaryOwner;
+    #[ORM\ManyToOne(targetEntity: DuplicateRevisionFailureTestSecondaryOwner::class, inversedBy: 'elements')]
+    protected $secondaryOwner;
 
     public function setPrimaryOwner(DuplicateRevisionFailureTestPrimaryOwner $owner): void
     {

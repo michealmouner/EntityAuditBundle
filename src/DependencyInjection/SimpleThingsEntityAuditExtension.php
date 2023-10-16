@@ -39,6 +39,7 @@ class SimpleThingsEntityAuditExtension extends Extension
             'revision_table_name',
             'revision_id_field_type',
             'global_ignore_columns',
+            'disable_foreign_keys',
         ];
 
         foreach ($configurables as $key) {
@@ -51,24 +52,31 @@ class SimpleThingsEntityAuditExtension extends Extension
             }
         }
 
-        $this->fixParametersFromDoctrineEventSubscriberTag($container, [
+        $this->fixParametersFromDoctrineEventListenerTag($container, [
             'simplethings_entityaudit.log_revisions_listener',
             'simplethings_entityaudit.create_schema_listener',
+            'simplethings_entityaudit.cache_listener',
         ]);
     }
 
-    private function fixParametersFromDoctrineEventSubscriberTag(ContainerBuilder $container, array $definitionNames): void
+    /**
+     * @param string[] $definitionNames
+     */
+    private function fixParametersFromDoctrineEventListenerTag(ContainerBuilder $container, array $definitionNames): void
     {
         foreach ($definitionNames as $definitionName) {
             $definition = $container->getDefinition($definitionName);
-            $tags = $definition->getTag('doctrine.event_subscriber');
-            $definition->clearTag('doctrine.event_subscriber');
+            $tags = $definition->getTag('doctrine.event_listener');
+            $definition->clearTag('doctrine.event_listener');
 
             foreach ($tags as $attributes) {
                 if (isset($attributes['connection'])) {
-                    $attributes['connection'] = (string) $container->getParameter('simplethings.entityaudit.connection');
+                    $connection = $container->getParameter('simplethings.entityaudit.connection');
+                    \assert(\is_scalar($connection));
+
+                    $attributes['connection'] = (string) $connection;
                 }
-                $definition->addTag('doctrine.event_subscriber', $attributes);
+                $definition->addTag('doctrine.event_listener', $attributes);
             }
         }
     }

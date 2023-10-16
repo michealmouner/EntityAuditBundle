@@ -27,10 +27,19 @@ class Configuration implements ConfigurationInterface
         Types::GUID,
     ];
 
+    /**
+     * @psalm-suppress PossiblyNullReference, UndefinedInterfaceMethod
+     *
+     * @see https://github.com/psalm/psalm-plugin-symfony/issues/174
+     *
+     * @return TreeBuilder
+     */
     public function getConfigTreeBuilder()
     {
         $builder = new TreeBuilder('simple_things_entity_audit');
-        $builder->getRootNode()
+        $rootNode = $builder->getRootNode();
+
+        $rootNode
             ->children()
                 ->scalarNode('connection')->defaultValue('default')->end()
                 ->scalarNode('entity_manager')->defaultValue('default')->end()
@@ -45,6 +54,7 @@ class Configuration implements ConfigurationInterface
                 ->scalarNode('revision_field_name')->defaultValue('rev')->end()
                 ->scalarNode('revision_type_field_name')->defaultValue('revtype')->end()
                 ->scalarNode('revision_table_name')->defaultValue('revisions')->end()
+                ->scalarNode('disable_foreign_keys')->defaultValue(false)->end()
                 ->scalarNode('revision_id_field_type')
                     ->defaultValue(Types::INTEGER)
                     // NEXT_MAJOR: Use enumNode() instead.

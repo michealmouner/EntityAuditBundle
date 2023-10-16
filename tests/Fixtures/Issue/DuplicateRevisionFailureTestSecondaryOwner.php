@@ -11,32 +11,26 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace SimpleThings\EntityAudit\Tests\Fixtures\Issue;
+namespace Sonata\EntityAuditBundle\Tests\Fixtures\Issue;
 
 use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity
- */
+#[ORM\Entity]
 class DuplicateRevisionFailureTestSecondaryOwner extends DuplicateRevisionFailureTestEntity
 {
     /**
-     * @ORM\ManyToOne(
-     *     targetEntity="DuplicateRevisionFailureTestPrimaryOwner",
-     *     inversedBy="secondaryOwners"
-     * )
+     * @var DuplicateRevisionFailureTestPrimaryOwner|null
      */
-    private $primaryOwner;
+    #[ORM\ManyToOne(targetEntity: DuplicateRevisionFailureTestPrimaryOwner::class, inversedBy: 'secondaryOwners')]
+    protected $primaryOwner;
 
     /**
-     * @ORM\OneToMany(
-     *     targetEntity="DuplicateRevisionFailureTestOwnedElement",
-     *     mappedBy="secondaryOwner",
-     *     cascade={"persist", "remove"}
-     * )
+     * @var Collection<int, DuplicateRevisionFailureTestOwnedElement>
      */
-    private $elements;
+    #[ORM\OneToMany(targetEntity: DuplicateRevisionFailureTestOwnedElement::class, mappedBy: 'secondaryOwner', cascade: ['persist', 'remove'])]
+    private Collection $elements;
 
     public function __construct()
     {

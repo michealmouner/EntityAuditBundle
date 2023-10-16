@@ -11,31 +11,33 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace SimpleThings\EntityAudit\Tests\Fixtures\Relation;
+namespace Sonata\EntityAuditBundle\Tests\Fixtures\Relation;
 
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity
- */
+#[ORM\Entity]
 class OwnedEntity2
 {
     /**
-     * @ORM\Id
-     * @ORM\Column(type="integer", name="strange_owned_id_name")
-     * @ORM\GeneratedValue(strategy="AUTO")
+     * @var int|null
      */
+    #[ORM\Id]
+    #[ORM\Column(type: Types::INTEGER, name: 'strange_owned_id_name')]
+    #[ORM\GeneratedValue]
     protected $id;
 
     /**
-     * @ORM\Column(type="string", name="even_strangier_column_name")
+     * @var string|null
      */
+    #[ORM\Column(type: Types::STRING, name: 'even_strangier_column_name')]
     protected $title;
 
     /**
-     * @ORM\ManyToOne(targetEntity="OwnerEntity")
-     * @ORM\JoinColumn(name="owner_id_goes_here", referencedColumnName="some_strange_key_name")
+     * @var OwnerEntity|null
      */
+    #[ORM\ManyToOne(targetEntity: OwnerEntity::class)]
+    #[ORM\JoinColumn(name: 'owner_id_goes_here', referencedColumnName: 'some_strange_key_name', onDelete: 'SET NULL')]
     protected $owner;
 
     public function getId(): ?int

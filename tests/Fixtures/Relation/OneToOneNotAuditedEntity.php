@@ -11,30 +11,32 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace SimpleThings\EntityAudit\Tests\Fixtures\Relation;
+namespace Sonata\EntityAuditBundle\Tests\Fixtures\Relation;
 
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity
- */
+#[ORM\Entity]
 class OneToOneNotAuditedEntity
 {
     /**
-     * @ORM\Id
-     * @ORM\Column(type="integer")
-     * @ORM\GeneratedValue(strategy="AUTO")
+     * @var int|null
      */
+    #[ORM\Id]
+    #[ORM\Column(type: Types::INTEGER)]
+    #[ORM\GeneratedValue]
     protected $id;
 
     /**
-     * @ORM\Column(type="string")
+     * @var string|null
      */
+    #[ORM\Column(type: Types::STRING)]
     protected $title;
 
     /**
-     * @ORM\OneToOne(targetEntity="OneToOneMasterEntity")
+     * @var OneToOneMasterEntity|null
      */
+    #[ORM\OneToOne(targetEntity: OneToOneMasterEntity::class)]
     protected $master;
 
     public function getId(): ?int

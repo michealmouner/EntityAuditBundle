@@ -20,9 +20,19 @@ namespace SimpleThings\EntityAudit\Utils;
  */
 class SimpleDiff
 {
+    /**
+     * @param array<int, string> $old
+     * @param array<int, string> $new
+     *
+     * @return string[]|array<int, array{d: array<int, string>, i: array<int, string>}>
+     */
     public function diff(array $old, array $new)
     {
         $maxlen = 0;
+        $omax = 0;
+        $nmax = 0;
+        $matrix = [];
+
         foreach ($old as $oindex => $ovalue) {
             $nkeys = array_keys($new, $ovalue, true);
             foreach ($nkeys as $nindex) {
@@ -46,14 +56,20 @@ class SimpleDiff
         );
     }
 
+    /**
+     * @param string $old
+     * @param string $new
+     *
+     * @return string
+     */
     public function htmlDiff($old, $new)
     {
         $ret = '';
         $diff = $this->diff(explode(' ', $old), explode(' ', $new));
         foreach ($diff as $k) {
             if (\is_array($k)) {
-                $ret .= (!empty($k['d']) ? '<del>'.implode(' ', $k['d']).'</del> ' : '').
-                        (!empty($k['i']) ? '<ins>'.implode(' ', $k['i']).'</ins> ' : '');
+                $ret .= ([] !== $k['d'] ? '<del>'.implode(' ', $k['d']).'</del> ' : '')
+                    .([] !== $k['i'] ? '<ins>'.implode(' ', $k['i']).'</ins> ' : '');
             } else {
                 $ret .= $k.' ';
             }

@@ -11,39 +11,38 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace SimpleThings\EntityAudit\Tests\Fixtures\Relation;
+namespace Sonata\EntityAuditBundle\Tests\Fixtures\Relation;
 
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity
- */
-class Page
+#[ORM\Entity]
+class Page implements \Stringable
 {
+    #[ORM\Id]
+    #[ORM\Column(type: Types::INTEGER)]
+    #[ORM\GeneratedValue]
+    protected ?int $id = null;
+
     /**
      * A page can have many aliases.
      *
-     * @var PageAlias[]
-     * @ORM\OneToMany(targetEntity="PageAlias", mappedBy="page", cascade={"persist"})
+     * @var Collection<int, PageAlias>
      */
-    protected $pageAliases;
+    #[ORM\OneToMany(targetEntity: PageAlias::class, mappedBy: 'page', cascade: ['persist'])]
+    protected Collection $pageAliases;
 
     /**
-     * @ORM\Id
-     * @ORM\Column(type="integer")
-     * @ORM\GeneratedValue(strategy="AUTO")
+     * @var Collection<string, PageLocalization>
      */
-    private $id;
-
-    /**
-     * @ORM\OneToMany(targetEntity="PageLocalization", mappedBy="page", indexBy="locale")
-     */
-    private $localizations;
+    #[ORM\OneToMany(targetEntity: PageLocalization::class, mappedBy: 'page', indexBy: 'locale')]
+    protected Collection $localizations;
 
     public function __construct()
     {
+        $this->pageAliases = new ArrayCollection();
         $this->localizations = new ArrayCollection();
     }
 
@@ -57,7 +56,10 @@ class Page
         return $this->id;
     }
 
-    public function getLocalizations(): ?Collection
+    /**
+     * @return Collection<string, PageLocalization>
+     */
+    public function getLocalizations(): Collection
     {
         return $this->localizations;
     }
@@ -65,6 +67,6 @@ class Page
     public function addLocalization(PageLocalization $localization): void
     {
         $localization->setPage($this);
-        $this->localizations->set($localization->getLocale(), $localization);
+        $this->localizations->set($localization->getLocale() ?? '', $localization);
     }
 }

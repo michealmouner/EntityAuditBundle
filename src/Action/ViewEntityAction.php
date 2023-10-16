@@ -19,22 +19,15 @@ use Twig\Environment;
 
 final class ViewEntityAction
 {
-    /**
-     * @var AuditReader
-     */
-    private $auditReader;
-
-    /**
-     * @var Environment
-     */
-    private $twig;
-
-    public function __construct(Environment $twig, AuditReader $auditReader)
-    {
-        $this->twig = $twig;
-        $this->auditReader = $auditReader;
+    public function __construct(
+        private Environment $twig,
+        private AuditReader $auditReader
+    ) {
     }
 
+    /**
+     * @phpstan-param class-string $className
+     */
     public function __invoke(string $className, string $id): Response
     {
         $revisions = $this->auditReader->findRevisions($className, $id);

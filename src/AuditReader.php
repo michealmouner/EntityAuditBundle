@@ -14,17 +14,16 @@ declare(strict_types=1);
 namespace SimpleThings\EntityAudit;
 
 use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception;
 use Doctrine\DBAL\Platforms\AbstractPlatform;
 use Doctrine\DBAL\Types\Type;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Mapping\ClassMetadata;
-use Doctrine\ORM\Mapping\ClassMetadataInfo;
 use Doctrine\ORM\Mapping\QuoteStrategy;
 use Doctrine\ORM\ORMException;
 use Doctrine\ORM\PersistentCollection;
 use Doctrine\ORM\Persisters\Entity\EntityPersister;
-use Doctrine\ORM\Query;
 use SimpleThings\EntityAudit\Collection\AuditedCollection;
 use SimpleThings\EntityAudit\Exception\DeletedException;
 use SimpleThings\EntityAudit\Exception\InvalidRevisionException;
@@ -32,74 +31,50 @@ use SimpleThings\EntityAudit\Exception\NoRevisionFoundException;
 use SimpleThings\EntityAudit\Exception\NotAuditedException;
 use SimpleThings\EntityAudit\Metadata\MetadataFactory;
 use SimpleThings\EntityAudit\Utils\ArrayDiff;
+use SimpleThings\EntityAudit\Utils\SQLResultCasing;
 
 class AuditReader
 {
-    /**
-     * @var EntityManagerInterface
-     */
-    private $em;
+    use SQLResultCasing;
 
-    /**
-     * @var AuditConfiguration
-     */
-    private $config;
+    private AbstractPlatform $platform;
 
-    /**
-     * @var MetadataFactory
-     */
-    private $metadataFactory;
-
-    /**
-     * @var AbstractPlatform
-     */
-    private $platform;
-
-    /**
-     * @var QuoteStrategy
-     */
-    private $quoteStrategy;
+    private QuoteStrategy $quoteStrategy;
 
     /**
      * Entity cache to prevent circular references.
      *
-     * @var array
+     * @var array<string, array<string, array<int|string, object>>>
+     *
+     * @phpstan-var array<class-string, array<string, array<int|string, object>>>
      */
-    private $entityCache;
+    private array $entityCache = [];
 
     /**
      * Decides if audited ToMany collections are loaded.
-     *
-     * @var bool
      */
-    private $loadAuditedCollections = true;
+    private bool $loadAuditedCollections = true;
 
     /**
      * Decides if audited ToOne collections are loaded.
-     *
-     * @var bool
      */
-    private $loadAuditedEntities = true;
+    private bool $loadAuditedEntities = true;
 
     /**
      * Decides if native (not audited) ToMany collections are loaded.
-     *
-     * @var bool
      */
-    private $loadNativeCollections = true;
+    private bool $loadNativeCollections = true;
 
     /**
      * Decides if native (not audited) ToOne collections are loaded.
-     *
-     * @var bool
      */
-    private $loadNativeEntities = true;
+    private bool $loadNativeEntities = true;
 
-    public function __construct(EntityManagerInterface $em, AuditConfiguration $config, MetadataFactory $factory)
-    {
-        $this->em = $em;
-        $this->config = $config;
-        $this->metadataFactory = $factory;
+    public function __construct(
+        private EntityManagerInterface $em,
+        private AuditConfiguration $config,
+        private MetadataFactory $metadataFactory
+    ) {
         $this->platform = $this->em->getConnection()->getDatabasePlatform();
         $this->quoteStrategy = $this->em->getConfiguration()->getQuoteStrategy();
     }
@@ -169,7 +144,7 @@ class AuditReader
     }
 
     /**
-     * @return \Doctrine\DBAL\Connection
+     * @return Connection
      */
     public function getConnection()
     {
@@ -200,9 +175,12 @@ class AuditReader
      * returns last revision INCLUDING "DEL" revision. If you want to throw exception instead, set
      * $threatDeletionAsException to true.
      *
-     * @param string           $className
-     * @param int|string|array $id
-     * @param int|string       $revision
+     * @template T of object
+     *
+     * @param string                                    $className
+     * @param int|string|array<string, int|string>      $id
+     * @param int|string                                $revision
+     * @param array{threatDeletionsAsExceptions?: bool} $options
      *
      * @throws DeletedException
      * @throws NoRevisionFoundException
@@ -211,10 +189,9 @@ class AuditReader
      * @throws ORMException
      * @throws \RuntimeException
      *
-     * @return object
+     * @return object|null
      *
-     * @phpstan-template T of object
-     * @phpstan-param class-string<T> $className
+     * @phpstan-param class-string<T>                   $className
      * @phpstan-return T|null
      */
     public function find($className, $id, $revision, array $options = [])
@@ -225,20 +202,20 @@ class AuditReader
             throw new NotAuditedException($className);
         }
 
-        /** @var ClassMetadataInfo|ClassMetadata $class */
-        $class = $this->em->getClassMetadata($className);
-        $tableName = $this->config->getTableName($class);
+        /** @var ClassMetadata<T> $classMetadata */
+        $classMetadata = $this->em->getClassMetadata($className);
+        $tableName = $this->config->getTableName($classMetadata);
 
         $whereSQL = 'e.'.$this->config->getRevisionFieldName().' <= ?';
 
-        foreach ($class->identifier as $idField) {
+        foreach ($classMetadata->identifier as $idField) {
             if (\is_array($id) && \count($id) > 0) {
                 $idKeys = array_keys($id);
                 $columnName = $idKeys[0];
-            } elseif (isset($class->fieldMappings[$idField])) {
-                $columnName = $class->fieldMappings[$idField]['columnName'];
-            } elseif (isset($class->associationMappings[$idField])) {
-                $columnName = $class->associationMappings[$idField]['joinColumns'][0];
+            } elseif (isset($classMetadata->fieldMappings[$idField])) {
+                $columnName = $classMetadata->fieldMappings[$idField]['columnName'];
+            } elseif (isset($classMetadata->associationMappings[$idField]['joinColumns'])) {
+                $columnName = $classMetadata->associationMappings[$idField]['joinColumns'][0]['name'];
             } else {
                 throw new \RuntimeException('column name not found  for'.$idField);
             }
@@ -247,89 +224,108 @@ class AuditReader
         }
 
         if (!\is_array($id)) {
-            $id = [$class->identifier[0] => $id];
+            $id = [$classMetadata->identifier[0] => $id];
         }
 
         $columnList = ['e.'.$this->config->getRevisionTypeFieldName()];
         $columnMap = [];
 
-        foreach ($class->fieldNames as $columnName => $field) {
-            $tableAlias = $class->isInheritanceTypeJoined() && $class->isInheritedField($field) && !$class->isIdentifier($field)
-                ? 're' // root entity
-                : 'e';
+        foreach ($classMetadata->fieldNames as $columnName => $field) {
+            $tableAlias = $classMetadata->isInheritanceTypeJoined()
+                && $classMetadata->isInheritedField($field)
+                && !$classMetadata->isIdentifier($field)
+                    ? 're' // root entity
+                    : 'e';
 
-            $type = Type::getType($class->fieldMappings[$field]['type']);
+            $type = Type::getType($classMetadata->fieldMappings[$field]['type']);
             $columnList[] = sprintf(
                 '%s AS %s',
                 $type->convertToPHPValueSQL(
-                    $tableAlias.'.'.$this->quoteStrategy->getColumnName($field, $class, $this->platform),
+                    $tableAlias.'.'.$this->quoteStrategy->getColumnName($field, $classMetadata, $this->platform),
                     $this->platform
                 ),
                 $this->platform->quoteSingleIdentifier($field)
             );
-            $columnMap[$field] = $this->platform->getSQLResultCasing($columnName);
+            $columnMap[$field] = $this->getSQLResultCasing($this->platform, $columnName);
         }
 
-        foreach ($class->associationMappings as $assoc) {
-            if (($assoc['type'] & ClassMetadata::TO_ONE) === 0 || !$assoc['isOwningSide']) {
+        foreach ($classMetadata->associationMappings as $assoc) {
+            if (
+                ($assoc['type'] & ClassMetadata::TO_ONE) === 0
+                || false === $assoc['isOwningSide']
+                || !isset($assoc['joinColumnFieldNames'])
+            ) {
                 continue;
             }
 
             foreach ($assoc['joinColumnFieldNames'] as $sourceCol) {
-                $tableAlias = $class->isInheritanceTypeJoined() &&
-                    $class->isInheritedAssociation($assoc['fieldName']) &&
-                    !$class->isIdentifier($assoc['fieldName'])
-                    ? 're' // root entity
-                    : 'e';
+                $tableAlias = $classMetadata->isInheritanceTypeJoined()
+                    && $classMetadata->isInheritedAssociation($assoc['fieldName'])
+                    && !$classMetadata->isIdentifier($assoc['fieldName'])
+                        ? 're' // root entity
+                        : 'e';
                 $columnList[] = $tableAlias.'.'.$sourceCol;
-                $columnMap[$sourceCol] = $this->platform->getSQLResultCasing($sourceCol);
+                $columnMap[$sourceCol] = $this->getSQLResultCasing($this->platform, $sourceCol);
             }
         }
 
         $joinSql = '';
-        if ($class->isInheritanceTypeJoined() && $class->name !== $class->rootEntityName) {
-            /** @var ClassMetadataInfo|ClassMetadata $rootClass */
-            $rootClass = $this->em->getClassMetadata($class->rootEntityName);
+        if ($classMetadata->isInheritanceTypeJoined() && $classMetadata->name !== $classMetadata->rootEntityName) {
+            $rootClass = $this->em->getClassMetadata($classMetadata->rootEntityName);
             $rootTableName = $this->config->getTableName($rootClass);
             $joinSql = "INNER JOIN {$rootTableName} re ON";
             $joinSql .= ' re.'.$this->config->getRevisionFieldName().' = e.'.$this->config->getRevisionFieldName();
-            foreach ($class->getIdentifierColumnNames() as $name) {
+            foreach ($classMetadata->getIdentifierColumnNames() as $name) {
                 $joinSql .= " AND re.$name = e.$name";
             }
         }
 
-        $values = array_merge([$revision], array_values($id));
+        $values = [...[$revision], ...array_values($id)];
 
-        if (!$class->isInheritanceTypeNone()) {
-            $columnList[] = $class->discriminatorColumn['name'];
-            if ($class->isInheritanceTypeSingleTable()
-                && null !== $class->discriminatorValue) {
+        if (
+            !$classMetadata->isInheritanceTypeNone()
+            && null !== $classMetadata->discriminatorColumn
+        ) {
+            $columnList[] = $classMetadata->discriminatorColumn['name'];
+            if ($classMetadata->isInheritanceTypeSingleTable()
+                && null !== $classMetadata->discriminatorValue) {
                 // Support for single table inheritance sub-classes
-                $allDiscrValues = array_flip($class->discriminatorMap);
-                $queriedDiscrValues = [$this->em->getConnection()->quote($class->discriminatorValue)];
-                foreach ($class->subClasses as $subclassName) {
+                $allDiscrValues = array_flip($classMetadata->discriminatorMap);
+                $queriedDiscrValues = [$this->em->getConnection()->quote($classMetadata->discriminatorValue)];
+                foreach ($classMetadata->subClasses as $subclassName) {
                     $queriedDiscrValues[] = $this->em->getConnection()->quote($allDiscrValues[$subclassName]);
                 }
 
-                $whereSQL .= ' AND '.$class->discriminatorColumn['name'].' IN '.'('.implode(', ', $queriedDiscrValues).')';
+                $whereSQL .= sprintf(
+                    ' AND %s IN (%s)',
+                    $classMetadata->discriminatorColumn['name'],
+                    implode(', ', $queriedDiscrValues)
+                );
             }
         }
 
-        $query = 'SELECT '.implode(', ', $columnList).' FROM '.$tableName.' e '.$joinSql.' WHERE '.$whereSQL.' ORDER BY e.'.$this->config->getRevisionFieldName().' DESC';
+        $query = sprintf(
+            'SELECT %s FROM %s e %s WHERE %s ORDER BY e.%s DESC',
+            implode(', ', $columnList),
+            $tableName,
+            $joinSql,
+            $whereSQL,
+            $this->config->getRevisionFieldName()
+        );
 
-        $row = $this->em->getConnection()->fetchAssoc($query, $values);
+        $row = $this->em->getConnection()->fetchAssociative($query, $values);
 
-        if (!$row) {
-            throw new NoRevisionFoundException($class->name, $id, $revision);
+        if (false === $row) {
+            throw new NoRevisionFoundException($classMetadata->name, $id, $revision);
         }
 
         if ($options['threatDeletionsAsExceptions'] && 'DEL' === $row[$this->config->getRevisionTypeFieldName()]) {
-            throw new DeletedException($class->name, $id, $revision);
+            throw new DeletedException($classMetadata->name, $id, $revision);
         }
 
         unset($row[$this->config->getRevisionTypeFieldName()]);
 
-        return $this->createEntity($class->name, $columnMap, $row, $revision);
+        return $this->createEntity($classMetadata->name, $columnMap, $row, $revision);
     }
 
     /**
@@ -338,7 +334,7 @@ class AuditReader
      * Return a list of all revisions.
      *
      * @param int|null $limit
-     * @param int|null $offset
+     * @param int      $offset
      *
      * @throws Exception
      *
@@ -355,11 +351,10 @@ class AuditReader
 
         $revisions = [];
         foreach ($revisionsData as $row) {
-            $revisions[] = new Revision(
-                $row['id'],
-                \DateTime::createFromFormat($this->platform->getDateTimeFormatString(), $row['timestamp']),
-                $row['username']
-            );
+            $timestamp = \DateTime::createFromFormat($this->platform->getDateTimeFormatString(), $row['timestamp']);
+            \assert(false !== $timestamp);
+
+            $revisions[] = new Revision($row['id'], $timestamp, $row['username']);
         }
 
         return $revisions;
@@ -368,12 +363,12 @@ class AuditReader
     /**
      * NEXT_MAJOR: Remove this method.
      *
+     * @param int|string $revision
+     *
+     * @return ChangedEntity<object>[]
+     *
      * @deprecated this function name is misspelled.
-     * Suggest using findEntitiesChangedAtRevision instead.
-     *
-     * @param string|int $revision
-     *
-     * @return ChangedEntity[]
+     *             Suggest using findEntitiesChangedAtRevision instead.
      */
     public function findEntitesChangedAtRevision($revision)
     {
@@ -383,16 +378,16 @@ class AuditReader
     /**
      * Return a list of ChangedEntity instances created at the given revision.
      *
-     * @param string|int $revision
+     * @param int|string $revision
      *
-     * @throws DeletedException
      * @throws NoRevisionFoundException
      * @throws NotAuditedException
      * @throws Exception
      * @throws ORMException
      * @throws \RuntimeException
+     * @throws DeletedException
      *
-     * @return ChangedEntity[]
+     * @return ChangedEntity<object>[]
      */
     public function findEntitiesChangedAtRevision($revision)
     {
@@ -400,14 +395,13 @@ class AuditReader
 
         $changedEntities = [];
         foreach ($auditedEntities as $className) {
-            /** @var ClassMetadataInfo|ClassMetadata $class */
-            $class = $this->em->getClassMetadata($className);
+            $classMetadata = $this->em->getClassMetadata($className);
 
-            if ($class->isInheritanceTypeSingleTable() && \count($class->subClasses) > 0) {
+            if ($classMetadata->isInheritanceTypeSingleTable() && \count($classMetadata->subClasses) > 0) {
                 continue;
             }
 
-            $tableName = $this->config->getTableName($class);
+            $tableName = $this->config->getTableName($classMetadata);
             $params = [];
 
             $whereSQL = 'e.'.$this->config->getRevisionFieldName().' = ?';
@@ -415,53 +409,65 @@ class AuditReader
             $params[] = $revision;
             $columnMap = [];
 
-            foreach ($class->fieldNames as $columnName => $field) {
-                $type = Type::getType($class->fieldMappings[$field]['type']);
-                $tableAlias = $class->isInheritanceTypeJoined() && $class->isInheritedField($field) && !$class->isIdentifier($field)
-                    ? 're' // root entity
-                    : 'e';
+            foreach ($classMetadata->fieldNames as $columnName => $field) {
+                $type = Type::getType($classMetadata->fieldMappings[$field]['type']);
+                $tableAlias = $classMetadata->isInheritanceTypeJoined()
+                    && $classMetadata->isInheritedField($field)
+                    && !$classMetadata->isIdentifier($field)
+                        ? 're' // root entity
+                        : 'e';
                 $columnList .= ', '.$type->convertToPHPValueSQL(
-                    $tableAlias.'.'.$this->quoteStrategy->getColumnName($field, $class, $this->platform),
+                    $tableAlias.'.'.$this->quoteStrategy->getColumnName($field, $classMetadata, $this->platform),
                     $this->platform
                 ).' AS '.$this->platform->quoteSingleIdentifier($field);
-                $columnMap[$field] = $this->platform->getSQLResultCasing($columnName);
+                $columnMap[$field] = $this->getSQLResultCasing($this->platform, $columnName);
             }
 
-            foreach ($class->associationMappings as $assoc) {
-                if (($assoc['type'] & ClassMetadata::TO_ONE) > 0 && $assoc['isOwningSide']) {
+            foreach ($classMetadata->associationMappings as $assoc) {
+                if (
+                    ($assoc['type'] & ClassMetadata::TO_ONE) > 0
+                    && true === $assoc['isOwningSide']
+                    && isset($assoc['targetToSourceKeyColumns'])
+                ) {
                     foreach ($assoc['targetToSourceKeyColumns'] as $sourceCol) {
                         $columnList .= ', '.$sourceCol;
-                        $columnMap[$sourceCol] = $this->platform->getSQLResultCasing($sourceCol);
+                        $columnMap[$sourceCol] = $this->getSQLResultCasing($this->platform, $sourceCol);
                     }
                 }
             }
 
             $joinSql = '';
-            if ($class->isInheritanceTypeSingleTable()) {
-                $columnList .= ', e.'.$class->discriminatorColumn['name'];
-                $whereSQL .= ' AND e.'.$class->discriminatorColumn['fieldName'].' = ?';
-                $params[] = $class->discriminatorValue;
-            } elseif ($class->isInheritanceTypeJoined() && $class->rootEntityName !== $class->name) {
-                $columnList .= ', re.'.$class->discriminatorColumn['name'];
+            if (
+                $classMetadata->isInheritanceTypeSingleTable()
+                && null !== $classMetadata->discriminatorColumn
+            ) {
+                $columnList .= ', e.'.$classMetadata->discriminatorColumn['name'];
+                $whereSQL .= ' AND e.'.$classMetadata->discriminatorColumn['fieldName'].' = ?';
+                $params[] = $classMetadata->discriminatorValue;
+            } elseif (
+                $classMetadata->isInheritanceTypeJoined()
+                && $classMetadata->rootEntityName !== $classMetadata->name
+                && null !== $classMetadata->discriminatorColumn
+            ) {
+                $columnList .= ', re.'.$classMetadata->discriminatorColumn['name'];
 
-                /** @var ClassMetadataInfo|ClassMetadata $rootClass */
-                $rootClass = $this->em->getClassMetadata($class->rootEntityName);
+                $rootClass = $this->em->getClassMetadata($classMetadata->rootEntityName);
                 $rootTableName = $this->config->getTableName($rootClass);
 
                 $joinSql = "INNER JOIN {$rootTableName} re ON";
                 $joinSql .= ' re.'.$this->config->getRevisionFieldName().' = e.'.$this->config->getRevisionFieldName();
-                foreach ($class->getIdentifierColumnNames() as $name) {
+                foreach ($classMetadata->getIdentifierColumnNames() as $name) {
                     $joinSql .= " AND re.$name = e.$name";
                 }
             }
 
             $query = 'SELECT '.$columnList.' FROM '.$tableName.' e '.$joinSql.' WHERE '.$whereSQL;
-            $revisionsData = $this->em->getConnection()->executeQuery($query, $params);
+            $revisionsData = $this->em->getConnection()->fetchAllAssociative($query, $params);
 
             foreach ($revisionsData as $row) {
                 $id = [];
 
-                foreach ($class->identifier as $idField) {
+                foreach ($classMetadata->identifier as $idField) {
                     $id[$idField] = $row[$idField];
                 }
 
@@ -481,10 +487,10 @@ class AuditReader
     /**
      * Return the revision object for a particular revision.
      *
-     * @param string|int $revision
+     * @param int|string $revision
      *
-     * @throws InvalidRevisionException
      * @throws Exception
+     * @throws InvalidRevisionException
      *
      * @return Revision
      */
@@ -494,11 +500,13 @@ class AuditReader
         $revisionsData = $this->em->getConnection()->fetchAllAssociative($query, [$revision]);
 
         if (1 === \count($revisionsData)) {
-            return new Revision(
-                $revisionsData[0]['id'],
-                \DateTime::createFromFormat($this->platform->getDateTimeFormatString(), $revisionsData[0]['timestamp']),
-                $revisionsData[0]['username']
+            $timestamp = \DateTime::createFromFormat(
+                $this->platform->getDateTimeFormatString(),
+                $revisionsData[0]['timestamp']
             );
+            \assert(false !== $timestamp);
+
+            return new Revision($revisionsData[0]['id'], $timestamp, $revisionsData[0]['username']);
         }
         throw new InvalidRevisionException($revision);
     }
@@ -506,15 +514,15 @@ class AuditReader
     /**
      * Find all revisions that were made of entity class with given id.
      *
-     * @param string           $className
-     * @param int|string|array $id
+     * @param string                               $className
+     * @param int|string|array<string, int|string> $id
      *
-     * @throws NotAuditedException
      * @throws Exception
+     * @throws NotAuditedException
      *
      * @return Revision[]
      *
-     * @phpstan-param class-string $className
+     * @phpstan-param class-string                 $className
      */
     public function findRevisions($className, $id)
     {
@@ -522,65 +530,6 @@ class AuditReader
             throw new NotAuditedException($className);
         }
 
-        /** @var ClassMetadataInfo|ClassMetadata $class */
-        $class = $this->em->getClassMetadata($className);
-        $tableName = $this->config->getTableName($class);
-
-        if (!\is_array($id)) {
-            $id = [$class->identifier[0] => $id];
-        }
-
-        $whereSQL = '';
-        foreach ($class->identifier as $idField) {
-            if (isset($class->fieldMappings[$idField])) {
-                if ($whereSQL) {
-                    $whereSQL .= ' AND ';
-                }
-                $whereSQL .= 'e.'.$class->fieldMappings[$idField]['columnName'].' = ?';
-            } elseif (isset($class->associationMappings[$idField])) {
-                if ($whereSQL) {
-                    $whereSQL .= ' AND ';
-                }
-                $whereSQL .= 'e.'.$class->associationMappings[$idField]['joinColumns'][0].' = ?';
-            }
-        }
-
-        $query = 'SELECT r.* FROM '.$this->config->getRevisionTableName().' r '.
-                 'INNER JOIN '.$tableName.' e ON r.id = e.'.$this->config->getRevisionFieldName().' WHERE '.$whereSQL.' ORDER BY r.id DESC';
-        $revisionsData = $this->em->getConnection()->fetchAllAssociative($query, array_values($id));
-
-        $revisions = [];
-        foreach ($revisionsData as $row) {
-            $revisions[] = new Revision(
-                $row['id'],
-                \DateTime::createFromFormat($this->platform->getDateTimeFormatString(), $row['timestamp']),
-                $row['username']
-            );
-        }
-
-        return $revisions;
-    }
-
-    /**
-     * Gets the current revision of the entity with given ID.
-     *
-     * @param string           $className
-     * @param int|string|array $id
-     *
-     * @throws NotAuditedException
-     * @throws Exception
-     *
-     * @return int|string
-     *
-     * @phpstan-param class-string $className
-     */
-    public function getCurrentRevision($className, $id)
-    {
-        if (!$this->metadataFactory->isAudited($className)) {
-            throw new NotAuditedException($className);
-        }
-
-        /** @var ClassMetadataInfo|ClassMetadata $classMetadata */
         $classMetadata = $this->em->getClassMetadata($className);
         $tableName = $this->config->getTableName($classMetadata);
 
@@ -591,22 +540,92 @@ class AuditReader
         $whereSQL = '';
         foreach ($classMetadata->identifier as $idField) {
             if (isset($classMetadata->fieldMappings[$idField])) {
-                if ($whereSQL) {
+                if ('' !== $whereSQL) {
                     $whereSQL .= ' AND ';
                 }
                 $whereSQL .= 'e.'.$classMetadata->fieldMappings[$idField]['columnName'].' = ?';
-            } elseif (isset($classMetadata->associationMappings[$idField])) {
-                if ($whereSQL) {
+            } elseif (isset($classMetadata->associationMappings[$idField]['joinColumns'])) {
+                if ('' !== $whereSQL) {
                     $whereSQL .= ' AND ';
                 }
-                $whereSQL .= 'e.'.$classMetadata->associationMappings[$idField]['joinColumns'][0].' = ?';
+                $whereSQL .= 'e.'.$classMetadata->associationMappings[$idField]['joinColumns'][0]['name'].' = ?';
+            }
+        }
+
+        $query = sprintf(
+            'SELECT r.* FROM %s r INNER JOIN %s e ON r.id = e.%s  WHERE %s ORDER BY r.id DESC',
+            $this->config->getRevisionTableName(),
+            $tableName,
+            $this->config->getRevisionFieldName(),
+            $whereSQL
+        );
+        $revisionsData = $this->em->getConnection()->fetchAllAssociative($query, array_values($id));
+
+        $revisions = [];
+        foreach ($revisionsData as $row) {
+            $timestamp = \DateTime::createFromFormat($this->platform->getDateTimeFormatString(), $row['timestamp']);
+            \assert(false !== $timestamp);
+
+            $revisions[] = new Revision($row['id'], $timestamp, $row['username']);
+        }
+
+        return $revisions;
+    }
+
+    /**
+     * NEXT_MAJOR: Add NoRevisionFoundException as possible exception.
+     * Gets the current revision of the entity with given ID.
+     *
+     * @param string                               $className
+     * @param int|string|array<string, int|string> $id
+     *
+     * @throws Exception
+     * @throws NotAuditedException
+     *
+     * @return int|string|null
+     *
+     * @phpstan-param class-string                 $className
+     */
+    public function getCurrentRevision($className, $id)
+    {
+        if (!$this->metadataFactory->isAudited($className)) {
+            throw new NotAuditedException($className);
+        }
+
+        $classMetadata = $this->em->getClassMetadata($className);
+        $tableName = $this->config->getTableName($classMetadata);
+
+        if (!\is_array($id)) {
+            $id = [$classMetadata->identifier[0] => $id];
+        }
+
+        $whereSQL = '';
+        foreach ($classMetadata->identifier as $idField) {
+            if (isset($classMetadata->fieldMappings[$idField])) {
+                if ('' !== $whereSQL) {
+                    $whereSQL .= ' AND ';
+                }
+                $whereSQL .= 'e.'.$classMetadata->fieldMappings[$idField]['columnName'].' = ?';
+            } elseif (isset($classMetadata->associationMappings[$idField]['joinColumns'])) {
+                if ('' !== $whereSQL) {
+                    $whereSQL .= ' AND ';
+                }
+                $whereSQL .= 'e.'.$classMetadata->associationMappings[$idField]['joinColumns'][0]['name'].' = ?';
             }
         }
 
         $query = 'SELECT e.'.$this->config->getRevisionFieldName().' FROM '.$tableName.' e '.
-                        ' WHERE '.$whereSQL.' ORDER BY e.'.$this->config->getRevisionFieldName().' DESC';
+            ' WHERE '.$whereSQL.' ORDER BY e.'.$this->config->getRevisionFieldName().' DESC';
 
-        return $this->em->getConnection()->fetchColumn($query, array_values($id));
+        $revision = $this->em->getConnection()->fetchOne($query, array_values($id));
+
+        if (false === $revision) {
+            // NEXT_MAJOR: Remove next line and uncomment the following one, also remove "null" as possible return type.
+            return null;
+            // throw new NoRevisionFoundException($className, $id, null);
+        }
+
+        return $revision;
     }
 
     /**
@@ -635,8 +654,8 @@ class AuditReader
         $oldObject = $this->find($className, $id, $oldRevision);
         $newObject = $this->find($className, $id, $newRevision);
 
-        $oldValues = $this->getEntityValues($className, $oldObject);
-        $newValues = $this->getEntityValues($className, $newObject);
+        $oldValues = null !== $oldObject ? $this->getEntityValues($className, $oldObject) : [];
+        $newValues = null !== $newObject ? $this->getEntityValues($className, $newObject) : [];
 
         $differ = new ArrayDiff();
 
@@ -649,13 +668,12 @@ class AuditReader
      * @param string $className
      * @param object $entity
      *
-     * @return array
+     * @return array<string, mixed>
      *
      * @phpstan-param class-string $className
      */
     public function getEntityValues($className, $entity)
     {
-        /** @var ClassMetadataInfo|ClassMetadata $metadata */
         $metadata = $this->em->getClassMetadata($className);
         $fields = $metadata->getFieldNames();
 
@@ -668,18 +686,21 @@ class AuditReader
     }
 
     /**
-     * @param string           $className
-     * @param int|string|array $id
+     * @template T of object
      *
-     * @throws DeletedException
+     * @param string                               $className
+     * @param int|string|array<string, int|string> $id
+     *
      * @throws NoRevisionFoundException
      * @throws NotAuditedException
      * @throws Exception
      * @throws ORMException
+     * @throws DeletedException
      *
-     * @return object[]
+     * @return array<object|null>
      *
-     * @phpstan-param class-string $className
+     * @phpstan-param class-string<T>              $className
+     * @phpstan-return array<T|null>
      */
     public function getEntityHistory($className, $id)
     {
@@ -687,20 +708,20 @@ class AuditReader
             throw new NotAuditedException($className);
         }
 
-        /** @var ClassMetadataInfo|ClassMetadata $class */
-        $class = $this->em->getClassMetadata($className);
-        $tableName = $this->config->getTableName($class);
+        /** @var ClassMetadata<T> $classMetadata */
+        $classMetadata = $this->em->getClassMetadata($className);
+        $tableName = $this->config->getTableName($classMetadata);
 
         if (!\is_array($id)) {
-            $id = [$class->identifier[0] => $id];
+            $id = [$classMetadata->identifier[0] => $id];
         }
 
         $whereId = [];
-        foreach ($class->identifier as $idField) {
-            if (isset($class->fieldMappings[$idField])) {
-                $columnName = $class->fieldMappings[$idField]['columnName'];
-            } elseif (isset($class->associationMappings[$idField])) {
-                $columnName = $class->associationMappings[$idField]['joinColumns'][0];
+        foreach ($classMetadata->identifier as $idField) {
+            if (isset($classMetadata->fieldMappings[$idField])) {
+                $columnName = $classMetadata->fieldMappings[$idField]['columnName'];
+            } elseif (isset($classMetadata->associationMappings[$idField]['joinColumns'])) {
+                $columnName = $classMetadata->associationMappings[$idField]['joinColumns'][0]['name'];
             } else {
                 continue;
             }
@@ -712,36 +733,47 @@ class AuditReader
         $columnList = [$this->config->getRevisionFieldName()];
         $columnMap = [];
 
-        foreach ($class->fieldNames as $columnName => $field) {
-            $type = Type::getType($class->fieldMappings[$field]['type']);
+        foreach ($classMetadata->fieldNames as $columnName => $field) {
+            $type = Type::getType($classMetadata->fieldMappings[$field]['type']);
             $columnList[] = $type->convertToPHPValueSQL(
-                $this->quoteStrategy->getColumnName($field, $class, $this->platform),
+                $this->quoteStrategy->getColumnName($field, $classMetadata, $this->platform),
                 $this->platform
             ).' AS '.$this->platform->quoteSingleIdentifier($field);
-            $columnMap[$field] = $this->platform->getSQLResultCasing($columnName);
+            $columnMap[$field] = $this->getSQLResultCasing($this->platform, $columnName);
         }
 
-        foreach ($class->associationMappings as $assoc) {
-            if (($assoc['type'] & ClassMetadata::TO_ONE) === 0 || !$assoc['isOwningSide']) {
+        foreach ($classMetadata->associationMappings as $assoc) {
+            if (
+                ($assoc['type'] & ClassMetadata::TO_ONE) === 0
+                || false === $assoc['isOwningSide']
+                || !isset($assoc['targetToSourceKeyColumns'])
+            ) {
                 continue;
             }
 
             foreach ($assoc['targetToSourceKeyColumns'] as $sourceCol) {
                 $columnList[] = $sourceCol;
-                $columnMap[$sourceCol] = $this->platform->getSQLResultCasing($sourceCol);
+                $columnMap[$sourceCol] = $this->getSQLResultCasing($this->platform, $sourceCol);
             }
         }
 
         $values = array_values($id);
 
-        $query = 'SELECT '.implode(', ', $columnList).' FROM '.$tableName.' e WHERE '.$whereSQL.' ORDER BY e.'.$this->config->getRevisionFieldName().' DESC';
+        $query = sprintf(
+            'SELECT %s FROM %s e WHERE %s ORDER BY e.%s DESC',
+            implode(', ', $columnList),
+            $tableName,
+            $whereSQL,
+            $this->config->getRevisionFieldName()
+        );
+
         $stmt = $this->em->getConnection()->executeQuery($query, $values);
 
         $result = [];
-        while ($row = $stmt->fetch(Query::HYDRATE_ARRAY)) {
+        while ($row = $stmt->fetchAssociative()) {
             $rev = $row[$this->config->getRevisionFieldName()];
             unset($row[$this->config->getRevisionFieldName()]);
-            $result[] = $this->createEntity($class->name, $columnMap, $row, $rev);
+            $result[] = $this->createEntity($classMetadata->name, $columnMap, $row, $rev);
         }
 
         return $result;
@@ -764,8 +796,12 @@ class AuditReader
     /**
      * Simplified and stolen code from UnitOfWork::createEntity.
      *
-     * @param string     $className
-     * @param int|string $revision
+     * @template T of object
+     *
+     * @param string                         $className
+     * @param array<string, string>          $columnMap
+     * @param array<string, int|string|null> $data
+     * @param int|string                     $revision
      *
      * @throws DeletedException
      * @throws NoRevisionFoundException
@@ -776,173 +812,388 @@ class AuditReader
      *
      * @return object
      *
-     * @phpstan-template T of object
-     * @phpstan-param class-string<T> $className
+     * @phpstan-param class-string<T>        $className
      * @phpstan-return T
      */
     private function createEntity($className, array $columnMap, array $data, $revision)
     {
-        /** @var ClassMetadataInfo|ClassMetadata $class */
-        $class = $this->em->getClassMetadata($className);
+        $classMetadata = $this->em->getClassMetadata($className);
 
-        //lookup revisioned entity cache
+        // lookup revisioned entity cache
         $keyParts = [];
 
-        foreach ($class->getIdentifierFieldNames() as $name) {
+        foreach ($classMetadata->getIdentifierFieldNames() as $name) {
             $keyParts[] = $data[$name];
         }
 
         $key = implode(':', $keyParts);
 
-        if (isset($this->entityCache[$className], $this->entityCache[$className][$key], $this->entityCache[$className][$key][$revision])
-        ) {
-            return $this->entityCache[$className][$key][$revision];
+        if (isset($this->entityCache[$className][$key][$revision])) {
+            /** @phpstan-var T $cachedEntity */
+            $cachedEntity = $this->entityCache[$className][$key][$revision];
+
+            return $cachedEntity;
         }
 
-        if (!$class->isInheritanceTypeNone()) {
-            if (!isset($data[$class->discriminatorColumn['name']])) {
+        if (
+            !$classMetadata->isInheritanceTypeNone()
+            && null !== $classMetadata->discriminatorColumn
+        ) {
+            if (!isset($data[$classMetadata->discriminatorColumn['name']])) {
                 throw new \RuntimeException('Expecting discriminator value in data set.');
             }
-            $discriminator = $data[$class->discriminatorColumn['name']];
-            if (!isset($class->discriminatorMap[$discriminator])) {
+            $discriminator = $data[$classMetadata->discriminatorColumn['name']];
+            if (!isset($classMetadata->discriminatorMap[$discriminator])) {
                 throw new \RuntimeException("No mapping found for [{$discriminator}].");
             }
 
-            if ($class->discriminatorValue) {
-                $entity = $this->em->getClassMetadata($class->discriminatorMap[$discriminator])->newInstance();
+            if (isset($classMetadata->discriminatorValue)) {
+                /** @phpstan-var T $entity */
+                $entity = $this->em->getClassMetadata($classMetadata->discriminatorMap[$discriminator])->newInstance();
             } else {
-                //a complex case when ToOne binding is against AbstractEntity having no discriminator
+                // a complex case when ToOne binding is against AbstractEntity having no discriminator
                 $pk = [];
 
-                foreach ($class->identifier as $field) {
-                    $pk[$class->getColumnName($field)] = $data[$field];
+                foreach ($classMetadata->identifier as $field) {
+                    if (isset($data[$field])) {
+                        $pk[$classMetadata->getColumnName($field)] = $data[$field];
+                    }
                 }
 
-                return $this->find($class->discriminatorMap[$discriminator], $pk, $revision);
+                /** @phpstan-var class-string<T> $classNameDiscriminator */
+                $classNameDiscriminator = $classMetadata->discriminatorMap[$discriminator];
+
+                /** @phpstan-var T $entity */
+                $entity = $this->find($classNameDiscriminator, $pk, $revision);
+
+                return $entity;
             }
         } else {
-            $entity = $class->newInstance();
+            /** @phpstan-var T $entity */
+            $entity = $classMetadata->newInstance();
         }
 
-        //cache the entity to prevent circular references
+        // cache the entity to prevent circular references
         $this->entityCache[$className][$key][$revision] = $entity;
 
         foreach ($data as $field => $value) {
-            if (isset($class->fieldMappings[$field])) {
-                $type = Type::getType($class->fieldMappings[$field]['type']);
+            if (isset($classMetadata->fieldMappings[$field])) {
+                $type = Type::getType($classMetadata->fieldMappings[$field]['type']);
                 $value = $type->convertToPHPValue($value, $this->platform);
-                $class->reflFields[$field]->setValue($entity, $value);
+
+                $reflField = $classMetadata->reflFields[$field];
+                \assert(null !== $reflField);
+                $reflField->setValue($entity, $value);
             }
         }
 
-        foreach ($class->associationMappings as $field => $assoc) {
-            // Check if the association is not among the fetch-joined associations already.
-            if (isset($hints['fetched'][$className][$field])) {
-                continue;
-            }
+        foreach ($classMetadata->associationMappings as $field => $assoc) {
+            /** @phpstan-var class-string<T> $targetEntity */
+            $targetEntity = $assoc['targetEntity'];
+            $targetClass = $this->em->getClassMetadata($targetEntity);
 
-            /** @var ClassMetadataInfo|ClassMetadata $targetClass */
-            $targetClass = $this->em->getClassMetadata($assoc['targetEntity']);
+            $mappedBy = $assoc['mappedBy'] ?? null;
 
-            if ($assoc['type'] & ClassMetadata::TO_ONE) {
-                //print_r($targetClass->discriminatorMap);
-                if ($this->metadataFactory->isAudited($assoc['targetEntity'])) {
+            if (0 !== ($assoc['type'] & ClassMetadata::TO_ONE)) {
+                if ($this->metadataFactory->isAudited($targetEntity)) {
                     if ($this->loadAuditedEntities) {
                         // Primary Key. Used for audit tables queries.
                         $pk = [];
                         // Primary Field. Used when fallback to Doctrine finder.
                         $pf = [];
 
-                        if ($assoc['isOwningSide']) {
+                        if (true === $assoc['isOwningSide'] && isset($assoc['targetToSourceKeyColumns'])) {
                             foreach ($assoc['targetToSourceKeyColumns'] as $foreign => $local) {
-                                $pk[$foreign] = $pf[$foreign] = $data[$columnMap[$local]];
-                            }
-                        } else {
-                            /** @var ClassMetadataInfo|ClassMetadata $otherEntityMeta */
-                            $otherEntityAssoc = $this->em->getClassMetadata($assoc['targetEntity'])->associationMappings[$assoc['mappedBy']];
+                                $key = $data[$columnMap[$local]];
+                                if (null === $key) {
+                                    continue;
+                                }
 
-                            foreach ($otherEntityAssoc['targetToSourceKeyColumns'] as $local => $foreign) {
-                                $pk[$foreign] = $pf[$otherEntityAssoc['fieldName']] = $data[$class->getFieldName($local)];
+                                $pk[$foreign] = $key;
+                                $pf[$foreign] = $key;
+                            }
+                        } elseif (null !== $mappedBy) {
+                            $otherEntityAssoc = $this->em->getClassMetadata($targetEntity)
+                                ->associationMappings[$mappedBy];
+
+                            if (isset($otherEntityAssoc['targetToSourceKeyColumns'])) {
+                                foreach ($otherEntityAssoc['targetToSourceKeyColumns'] as $local => $foreign) {
+                                    $key = $data[$classMetadata->getFieldName($local)];
+                                    if (null === $key) {
+                                        continue;
+                                    }
+
+                                    $pk[$foreign] = $key;
+                                    $pf[$otherEntityAssoc['fieldName']] = $key;
+                                }
                             }
                         }
 
-                        $pk = array_filter($pk, static function ($value) {
-                            return null !== $value;
-                        });
-
-                        if (!$pk) {
-                            $class->reflFields[$field]->setValue($entity, null);
+                        if ([] === $pk) {
+                            $value = null;
                         } else {
                             try {
-                                $value = $this->find($targetClass->name, $pk, $revision, ['threatDeletionsAsExceptions' => true]);
-                            } catch (DeletedException $e) {
+                                $value = $this->find(
+                                    $targetClass->name,
+                                    $pk,
+                                    $revision,
+                                    ['threatDeletionsAsExceptions' => true]
+                                );
+                            } catch (DeletedException) {
                                 $value = null;
-                            } catch (NoRevisionFoundException $e) {
+                            } catch (NoRevisionFoundException) {
                                 // The entity does not have any revision yet. So let's get the actual state of it.
                                 $value = $this->em->getRepository($targetClass->name)->findOneBy($pf);
                             }
-
-                            $class->reflFields[$field]->setValue($entity, $value);
                         }
                     } else {
-                        $class->reflFields[$field]->setValue($entity, null);
+                        $value = null;
                     }
                 } else {
                     if ($this->loadNativeEntities) {
-                        if ($assoc['isOwningSide']) {
+                        if (true === $assoc['isOwningSide'] && isset($assoc['targetToSourceKeyColumns'])) {
                             $associatedId = [];
                             foreach ($assoc['targetToSourceKeyColumns'] as $targetColumn => $srcColumn) {
                                 $joinColumnValue = $data[$columnMap[$srcColumn]] ?? null;
                                 if (null !== $joinColumnValue) {
-                                    $associatedId[$targetClass->fieldNames[$targetColumn]] = $joinColumnValue;
+                                    $targetField = $targetClass->fieldNames[$targetColumn];
+                                    $joinColumnType = Type::getType($targetClass->fieldMappings[$targetField]['type']);
+                                    $joinColumnValue = $joinColumnType->convertToPHPValue(
+                                        $joinColumnValue,
+                                        $this->platform
+                                    );
+                                    $associatedId[$targetField] = $joinColumnValue;
                                 }
                             }
-                            if (!$associatedId) {
+                            if ([] === $associatedId) {
                                 // Foreign key is NULL
-                                $class->reflFields[$field]->setValue($entity, null);
+                                $value = null;
                             } else {
-                                $associatedEntity = $this->em->getReference($targetClass->name, $associatedId);
-                                $class->reflFields[$field]->setValue($entity, $associatedEntity);
+                                $value = $this->em->getReference($targetClass->name, $associatedId);
                             }
                         } else {
                             // Inverse side of x-to-one can never be lazy
-                            $class->reflFields[$field]->setValue($entity, $this->getEntityPersister($assoc['targetEntity'])
-                                ->loadOneToOneEntity($assoc, $entity));
+                            $value = $this->getEntityPersister($targetEntity)
+                                ->loadOneToOneEntity($assoc, $entity);
                         }
                     } else {
-                        $class->reflFields[$field]->setValue($entity, null);
+                        $value = null;
                     }
                 }
-            } elseif ($assoc['type'] & ClassMetadata::ONE_TO_MANY) {
-                if ($this->metadataFactory->isAudited($assoc['targetEntity'])) {
+
+                $reflField = $classMetadata->reflFields[$field];
+                \assert(null !== $reflField);
+                $reflField->setValue($entity, $value);
+            } elseif (
+                0 !== ($assoc['type'] & ClassMetadata::ONE_TO_MANY)
+                && null !== $mappedBy
+                && isset($targetClass->associationMappings[$mappedBy]['sourceToTargetKeyColumns'])
+            ) {
+                if ($this->metadataFactory->isAudited($targetEntity)) {
                     if ($this->loadAuditedCollections) {
                         $foreignKeys = [];
-                        foreach ($targetClass->associationMappings[$assoc['mappedBy']]['sourceToTargetKeyColumns'] as $local => $foreign) {
-                            $field = $class->getFieldForColumn($foreign);
-                            $foreignKeys[$local] = $class->reflFields[$field]->getValue($entity);
+                        foreach ($targetClass->associationMappings[$mappedBy]['sourceToTargetKeyColumns'] as $local => $foreign) {
+                            $field = $classMetadata->getFieldForColumn($foreign);
+                            $reflField = $classMetadata->reflFields[$field];
+                            \assert(null !== $reflField);
+                            $foreignKeys[$local] = $reflField->getValue($entity);
                         }
 
-                        $collection = new AuditedCollection($this, $targetClass->name, $targetClass, $assoc, $foreignKeys, $revision);
-
-                        $class->reflFields[$assoc['fieldName']]->setValue($entity, $collection);
+                        $collection = new AuditedCollection(
+                            $this,
+                            $targetClass->name,
+                            $targetClass,
+                            $assoc,
+                            $foreignKeys,
+                            $revision
+                        );
                     } else {
-                        $class->reflFields[$assoc['fieldName']]->setValue($entity, new ArrayCollection());
+                        $collection = new ArrayCollection();
                     }
                 } else {
                     if ($this->loadNativeCollections) {
                         $collection = new PersistentCollection($this->em, $targetClass, new ArrayCollection());
 
-                        $this->getEntityPersister($assoc['targetEntity'])
+                        $this->getEntityPersister($targetEntity)
                             ->loadOneToManyCollection($assoc, $entity, $collection);
-
-                        $class->reflFields[$assoc['fieldName']]->setValue($entity, $collection);
                     } else {
-                        $class->reflFields[$assoc['fieldName']]->setValue($entity, new ArrayCollection());
+                        $collection = new ArrayCollection();
                     }
+                }
+
+                $reflField = $classMetadata->reflFields[$assoc['fieldName']];
+                \assert(null !== $reflField);
+                $reflField->setValue($entity, $collection);
+            } elseif (0 !== ($assoc['type'] & ClassMetadata::MANY_TO_MANY)) {
+                if ($assoc['isOwningSide'] && isset(
+                    $assoc['relationToSourceKeyColumns'],
+                    $assoc['relationToTargetKeyColumns'],
+                    $assoc['joinTable']['name']
+                )) {
+                    $whereId = [$this->config->getRevisionFieldName().' = ?'];
+                    $values = [$revision];
+                    foreach ($assoc['relationToSourceKeyColumns'] as $sourceKeyJoinColumn => $sourceKeyColumn) {
+                        $whereId[] = "{$sourceKeyJoinColumn} = ?";
+
+                        $reflField = $classMetadata->reflFields['id'];
+                        \assert(null !== $reflField);
+
+                        $values[] = $reflField->getValue($entity);
+                    }
+
+                    $whereSQL = implode(' AND ', $whereId);
+                    $columnList = [
+                        $this->config->getRevisionFieldName(),
+                        $this->config->getRevisionTypeFieldName(),
+                    ];
+                    $tableName = $this->config->getTablePrefix()
+                        .$assoc['joinTable']['name']
+                        .$this->config->getTableSuffix();
+
+                    foreach ($assoc['relationToTargetKeyColumns'] as $targetKeyJoinColumn => $targetKeyColumn) {
+                        $columnList[] = $targetKeyJoinColumn;
+                    }
+
+                    $query = sprintf(
+                        'SELECT %s FROM %s e WHERE %s ORDER BY e.%s DESC',
+                        implode(', ', $columnList),
+                        $tableName,
+                        $whereSQL,
+                        $this->config->getRevisionFieldName()
+                    );
+
+                    $rows = $this->em->getConnection()->fetchAllAssociative($query, $values);
+
+                    /** @var ArrayCollection<int, object> */
+                    $collection = new ArrayCollection();
+                    if (0 < \count($rows)) {
+                        if ($this->metadataFactory->isAudited($targetEntity)) {
+                            foreach ($rows as $row) {
+                                $id = [];
+
+                                /** @phpstan-var string $targetKeyColumn */
+                                foreach ($assoc['relationToTargetKeyColumns'] as $targetKeyJoinColumn => $targetKeyColumn) {
+                                    $joinKey = $row[$targetKeyJoinColumn];
+                                    $id[$targetKeyColumn] = $joinKey;
+                                }
+                                $object = $this->find($targetClass->getName(), $id, $revision);
+                                if (null !== $object) {
+                                    $collection->add($object);
+                                }
+                            }
+                        } else {
+                            $reflField = $classMetadata->reflFields[$assoc['fieldName']];
+                            \assert(null !== $reflField);
+
+                            if ($this->loadNativeCollections) {
+                                $collection = new PersistentCollection(
+                                    $this->em,
+                                    $targetClass,
+                                    new ArrayCollection()
+                                );
+
+                                $this->getEntityPersister($targetEntity)
+                                    ->loadManyToManyCollection($assoc, $entity, $collection);
+
+                                $reflField->setValue($entity, $collection);
+                            } else {
+                                $reflField->setValue($entity, new ArrayCollection());
+                            }
+                        }
+                    }
+                    $reflField = $classMetadata->reflFields[$field];
+                    \assert(null !== $reflField);
+
+                    $reflField->setValue($entity, $collection);
+                } elseif (isset($targetClass->associationMappings[$mappedBy])) {
+                    $targetAssoc = $targetClass->associationMappings[$mappedBy];
+                    $whereId = [$this->config->getRevisionFieldName().' = ?'];
+                    $values = [$revision];
+
+                    /** @var ArrayCollection<int, object> */
+                    $collection = new ArrayCollection();
+
+                    // if the  owning side of the relation is audited, fetch the audited values, otherwise fetch
+                    // data from the main table
+                    if ($this->metadataFactory->isAudited($assoc['targetEntity'])
+                        && isset(
+                            $targetAssoc['relationToSourceKeyColumns'],
+                            $targetAssoc['relationToSourceKeyColumns'],
+                            $targetAssoc['joinTable']['name'],
+                            $targetAssoc['relationToTargetKeyColumns']
+                        )) {
+                        foreach ($targetAssoc['relationToTargetKeyColumns'] as $targetKeyJoinColumn => $targetKeyColumn) {
+                            $whereId[] = "{$targetKeyJoinColumn} = ?";
+                            $reflField = $classMetadata->reflFields['id'];
+                            \assert(null !== $reflField);
+                            $values[] = $reflField->getValue($entity);
+                        }
+
+                        $whereSQL = implode(' AND ', $whereId);
+                        $columnList = [
+                            $this->config->getRevisionFieldName(),
+                            $this->config->getRevisionTypeFieldName(),
+                        ];
+
+                        $tableName = $this->config->getTablePrefix()
+                            .$targetAssoc['joinTable']['name']
+                            .$this->config->getTableSuffix();
+
+                        foreach ($targetAssoc['relationToSourceKeyColumns'] as $sourceKeyJoinColumn => $sourceKeyColumn) {
+                            $columnList[] = $sourceKeyJoinColumn;
+                        }
+                        $query = sprintf(
+                            'SELECT %s FROM %s e WHERE %s ORDER BY e.%s DESC',
+                            implode(', ', $columnList),
+                            $tableName,
+                            $whereSQL,
+                            $this->config->getRevisionFieldName()
+                        );
+
+                        $rows = $this->em->getConnection()->fetchAllAssociative($query, $values);
+
+                        if (0 < \count($rows)) {
+                            foreach ($rows as $row) {
+                                $id = [];
+                                /** @phpstan-var string $sourceKeyColumn */
+                                foreach ($targetAssoc['relationToSourceKeyColumns'] as $sourceKeyJoinColumn => $sourceKeyColumn) {
+                                    $joinKey = $row[$sourceKeyJoinColumn];
+                                    $id[$sourceKeyColumn] = $joinKey;
+                                }
+
+                                $object = $this->find($targetClass->getName(), $id, $revision);
+                                if (null !== $object) {
+                                    $collection->add($object);
+                                }
+                            }
+                        }
+                    } else {
+                        $reflField = $classMetadata->reflFields[$assoc['fieldName']];
+                        \assert(null !== $reflField);
+
+                        if ($this->loadNativeCollections) {
+                            $collection = new PersistentCollection(
+                                $this->em,
+                                $targetClass,
+                                new ArrayCollection()
+                            );
+
+                            $this->getEntityPersister($assoc['targetEntity'])
+                                ->loadManyToManyCollection($assoc, $entity, $collection);
+
+                            $reflField->setValue($entity, $collection);
+                        } else {
+                            $reflField->setValue($entity, new ArrayCollection());
+                        }
+                    }
+                    $reflField = $classMetadata->reflFields[$field];
+                    \assert(null !== $reflField);
+                    $reflField->setValue($entity, $collection);
                 }
             } else {
                 // Inject collection
-                $reflField = $class->reflFields[$field];
+                $reflField = $classMetadata->reflFields[$field];
+                \assert(null !== $reflField);
                 $reflField->setValue($entity, new ArrayCollection());
             }
         }

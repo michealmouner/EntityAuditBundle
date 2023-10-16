@@ -5,11 +5,16 @@
 name: Lint
 
 on:
+    schedule:
+        - cron: '30 0 * * *'
     push:
         branches:
             - 1.x
-            - master
+            - 2.x
     pull_request:
+
+permissions:
+    contents: read
 
 jobs:
     php-cs-fixer:
@@ -19,26 +24,43 @@ jobs:
 
         steps:
             - name: Checkout
-              uses: actions/checkout@v2
+              uses: actions/checkout@v3
 
-            - name: Run PHP-CS-Fixer
-              uses: docker://oskarstark/php-cs-fixer-ga:2.18.5
+            - name: Install PHP with extensions
+              uses: shivammathur/setup-php@v2
               with:
-                  args: --ansi --verbose --diff --dry-run
+                  php-version: '8.2'
+                  coverage: none
+                  tools: composer:v2
 
-    composer-normalize:
-        name: composer-normalize
+            - name: Install Composer dependencies (highest)
+              uses: ramsey/composer-install@v2
+              with:
+                  dependency-versions: highest
+
+            - name: Lint PHP files
+              run: make lint-php
+
+    composer:
+        name: Composer
 
         runs-on: ubuntu-latest
 
         steps:
             - name: Checkout
-              uses: actions/checkout@v2
+              uses: actions/checkout@v3
 
-            - name: Run composer-normalize
-              uses: docker://ergebnis/composer-normalize-action:0.8.0
+            - name: Install PHP with extensions
+              uses: shivammathur/setup-php@v2
               with:
-                  args: --dry-run
+                  php-version: '8.2'
+                  coverage: none
+                  tools: composer:v2, composer-normalize:2
+              env:
+                  COMPOSER_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Lint Composer
+              run: make lint-composer
 
     yaml-files:
         name: YAML files
@@ -47,15 +69,10 @@ jobs:
 
         steps:
             - name: Checkout
-              uses: actions/checkout@v2
+              uses: actions/checkout@v3
 
-            - name: Install Ruby 2.6
-              uses: actions/setup-ruby@v1
-              with:
-                  ruby-version: '2.6'
-
-            - name: Install required gem
-              run: gem install yaml-lint
+            - name: Install yamllint
+              run: sudo apt-get install yamllint
 
             - name: Lint files
               run: make lint-yaml
@@ -67,10 +84,13 @@ jobs:
 
         steps:
             - name: Checkout
-              uses: actions/checkout@v2
+              uses: actions/checkout@v3
 
             - name: Install required dependencies
               run: sudo apt-get update && sudo apt-get install libxml2-utils
 
-            - name: Lint files
+            - name: Lint xml files
               run: make lint-xml
+
+            - name: Lint xliff files
+              run: make lint-xliff

@@ -11,19 +11,18 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace SimpleThings\EntityAudit\Tests\Fixtures\Relation;
+namespace Sonata\EntityAuditBundle\Tests\Fixtures\Relation;
 
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity
- */
+#[ORM\Entity]
 class RelationOneToOneEntity extends RelationAbstractEntityBase
 {
     /**
-     * @ORM\OneToOne(targetEntity="RelationReferencedEntity", inversedBy="oneToOne")
-     * @ORM\JoinColumn(name="one_id", referencedColumnName="id_column")
+     * @var RelationReferencedEntity|null
      */
+    #[ORM\OneToOne(targetEntity: RelationReferencedEntity::class, inversedBy: 'oneToOne')]
+    #[ORM\JoinColumn(name: 'one_id', referencedColumnName: 'id_column')]
     protected $referencedEntity;
 
     public function getReferencedEntity(): ?RelationReferencedEntity

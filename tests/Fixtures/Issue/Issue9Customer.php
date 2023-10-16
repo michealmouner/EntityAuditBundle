@@ -11,32 +11,37 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace SimpleThings\EntityAudit\Tests\Fixtures\Issue;
+namespace Sonata\EntityAuditBundle\Tests\Fixtures\Issue;
 
 use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity
- */
+#[ORM\Entity]
 class Issue9Customer
 {
     /**
-     * @ORM\Id
-     * @ORM\Column(type="integer")
-     * @ORM\GeneratedValue(strategy="AUTO")
+     * @var int|null
      */
-    private $id;
+    #[ORM\Id]
+    #[ORM\Column(type: Types::INTEGER)]
+    #[ORM\GeneratedValue]
+    protected $id;
 
     /**
-     * @ORM\OneToMany(targetEntity="Issue9Address", mappedBy="customer")
+     * @var Collection<int, Issue9Address>
      */
-    private $addresses;
+    #[ORM\OneToMany(targetEntity: Issue9Address::class, mappedBy: 'customer')]
+    private Collection $addresses;
 
-    /**
-     * @ORM\OneToOne(targetEntity="Issue9Address")
-     */
-    private $primary_address;
+    #[ORM\OneToOne(targetEntity: Issue9Address::class)]
+    private ?Issue9Address $primaryAddress = null;
+
+    public function __construct()
+    {
+        $this->addresses = new ArrayCollection();
+    }
 
     public function getId(): ?int
     {
@@ -44,28 +49,28 @@ class Issue9Customer
     }
 
     /**
-     * @return ArrayCollection|Issue9Address[]
+     * @return Collection<int, Issue9Address>
      */
-    public function getAddresses()
+    public function getAddresses(): Collection
     {
         return $this->addresses;
     }
 
+    /**
+     * @param Collection<int, Issue9Address> $addresses
+     */
     public function setAddresses($addresses): void
     {
         $this->addresses = $addresses;
     }
 
-    /**
-     * @return Issue9Address
-     */
     public function getPrimaryAddress(): ?Issue9Address
     {
-        return $this->primary_address;
+        return $this->primaryAddress;
     }
 
-    public function setPrimaryAddress(Issue9Address $primary_address): void
+    public function setPrimaryAddress(Issue9Address $primaryAddress): void
     {
-        $this->primary_address = $primary_address;
+        $this->primaryAddress = $primaryAddress;
     }
 }

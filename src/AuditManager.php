@@ -15,8 +15,10 @@ namespace SimpleThings\EntityAudit;
 
 use Doctrine\Common\EventManager;
 use Doctrine\ORM\EntityManager;
+use Psr\Clock\ClockInterface;
 use SimpleThings\EntityAudit\EventListener\CreateSchemaListener;
 use SimpleThings\EntityAudit\EventListener\LogRevisionsListener;
+use SimpleThings\EntityAudit\Metadata\MetadataFactory;
 
 /**
  * Audit Manager grants access to metadata and configuration
@@ -24,26 +26,36 @@ use SimpleThings\EntityAudit\EventListener\LogRevisionsListener;
  */
 class AuditManager
 {
-    private $config;
+    private MetadataFactory $metadataFactory;
 
-    private $metadataFactory;
-
-    public function __construct(AuditConfiguration $config)
-    {
-        $this->config = $config;
+    public function __construct(
+        private AuditConfiguration $config,
+        private ?ClockInterface $clock = null
+    ) {
         $this->metadataFactory = $config->createMetadataFactory();
     }
 
+    /**
+     * @return MetadataFactory
+     */
     public function getMetadataFactory()
     {
         return $this->metadataFactory;
     }
 
+    /**
+     * @return AuditConfiguration
+     */
     public function getConfiguration()
     {
         return $this->config;
     }
 
+    /**
+     * NEXT_MAJOR: Use `\Doctrine\ORM\EntityManagerInterface` for argument 1.
+     *
+     * @return AuditReader
+     */
     public function createAuditReader(EntityManager $em)
     {
         return new AuditReader($em, $this->config, $this->metadataFactory);
@@ -52,6 +64,6 @@ class AuditManager
     public function registerEvents(EventManager $evm): void
     {
         $evm->addEventSubscriber(new CreateSchemaListener($this));
-        $evm->addEventSubscriber(new LogRevisionsListener($this));
+        $evm->addEventSubscriber(new LogRevisionsListener($this, $this->clock));
     }
 }

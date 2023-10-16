@@ -15,29 +15,26 @@ namespace SimpleThings\EntityAudit\Action;
 
 use SimpleThings\EntityAudit\AuditReader;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Twig\Environment;
 
 final class ViewDetailAction
 {
-    /**
-     * @var AuditReader
-     */
-    private $auditReader;
-
-    /**
-     * @var Environment
-     */
-    private $twig;
-
-    public function __construct(Environment $twig, AuditReader $auditReader)
-    {
-        $this->twig = $twig;
-        $this->auditReader = $auditReader;
+    public function __construct(
+        private Environment $twig,
+        private AuditReader $auditReader
+    ) {
     }
 
+    /**
+     * @phpstan-param class-string $className
+     */
     public function __invoke(string $className, string $id, int $rev): Response
     {
         $entity = $this->auditReader->find($className, $id, $rev);
+        if (null === $entity) {
+            throw new NotFoundHttpException('No revision was found.');
+        }
 
         $data = $this->auditReader->getEntityValues($className, $entity);
         krsort($data);

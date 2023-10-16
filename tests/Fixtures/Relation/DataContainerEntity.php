@@ -11,39 +11,24 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace SimpleThings\EntityAudit\Tests\Fixtures\Relation;
+namespace Sonata\EntityAuditBundle\Tests\Fixtures\Relation;
 
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * Data container entity.
- *
- * @ORM\Entity
- */
+#[ORM\Entity]
 class DataContainerEntity
 {
-    /**
-     * @var int
-     *
-     * @ORM\Column(type="integer")
-     * @ORM\Id
-     * @ORM\GeneratedValue(strategy="AUTO")
-     */
-    private $id;
+    #[ORM\Id]
+    #[ORM\Column(type: Types::INTEGER)]
+    #[ORM\GeneratedValue]
+    protected ?int $id = null;
 
-    /**
-     * @var AbstractDataEntity
-     *
-     * @ORM\OneToOne(targetEntity="AbstractDataEntity", inversedBy="dataContainer", cascade={"persist", "remove"})
-     */
-    private $data;
+    #[ORM\OneToOne(targetEntity: AbstractDataEntity::class, inversedBy: 'dataContainer', cascade: ['persist', 'remove'])]
+    private ?AbstractDataEntity $data = null;
 
-    /**
-     * @var string
-     *
-     * @ORM\Column(type="string")
-     */
-    private $name;
+    #[ORM\Column(type: Types::STRING)]
+    private ?string $name = null;
 
     public function getId(): ?int
     {
@@ -55,7 +40,7 @@ class DataContainerEntity
         return $this->data;
     }
 
-    public function setData(AbstractDataEntity $data)
+    public function setData(AbstractDataEntity $data): void
     {
         $this->data = $data;
     }
@@ -65,7 +50,7 @@ class DataContainerEntity
         return $this->name;
     }
 
-    public function setName(string $name)
+    public function setName(string $name): void
     {
         $this->name = $name;
     }

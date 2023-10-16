@@ -11,35 +11,32 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace SimpleThings\EntityAudit\Tests\Fixtures\Relation;
+namespace Sonata\EntityAuditBundle\Tests\Fixtures\Relation;
 
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity
- */
+#[ORM\Entity]
 class PageLocalization
 {
     /**
-     * @ORM\Id
-     * @ORM\Column(type="integer")
-     * @ORM\GeneratedValue(strategy="AUTO")
+     * @var int|null
      */
+    #[ORM\Id]
+    #[ORM\Column(type: Types::INTEGER)]
+    #[ORM\GeneratedValue]
     protected $id;
 
     /**
-     * @ORM\Column(type="string")
+     * @var Page|null
      */
-    private $locale;
+    #[ORM\ManyToOne(targetEntity: Page::class, inversedBy: 'localizations')]
+    protected $page;
 
-    /**
-     * @ORM\ManyToOne(targetEntity="Page", inversedBy="localizations")
-     */
-    private $page;
-
-    public function __construct(string $locale)
-    {
-        $this->locale = $locale;
+    public function __construct(
+        #[ORM\Column(type: Types::STRING)]
+        protected string $locale
+    ) {
     }
 
     public function getId(): ?int

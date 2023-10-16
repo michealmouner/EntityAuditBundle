@@ -11,23 +11,19 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace SimpleThings\EntityAudit\Tests\Fixtures\Relation;
+namespace Sonata\EntityAuditBundle\Tests\Fixtures\Relation;
 
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
 /**
  * Legal data entity.
- *
- * @ORM\Entity
  */
+#[ORM\Entity]
 class DataLegalEntity extends AbstractDataEntity
 {
-    /**
-     * @var string
-     *
-     * @ORM\Column(type="string")
-     */
-    private $company;
+    #[ORM\Column(type: Types::STRING)]
+    private ?string $company = null;
 
     public function getCompany(): ?string
     {

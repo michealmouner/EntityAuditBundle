@@ -11,37 +11,24 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace SimpleThings\EntityAudit\Tests\Fixtures\Issue;
+namespace Sonata\EntityAuditBundle\Tests\Fixtures\Issue;
 
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * Class Issue156ContactTelephoneNumber.
- *
- * @ORM\Entity()
- */
+#[ORM\Entity]
 class Issue156ContactTelephoneNumber
 {
-    /**
-     * @ORM\Id
-     * @ORM\Column(type="integer")
-     * @ORM\GeneratedValue(strategy="AUTO")
-     */
-    private $id;
+    #[ORM\Id]
+    #[ORM\Column(type: Types::INTEGER)]
+    #[ORM\GeneratedValue]
+    private ?int $id = null;
 
-    /**
-     * @var Issue156Contact
-     *
-     * @ORM\ManyToOne(targetEntity="Issue156Contact", inversedBy="telephoneNumbers")
-     */
-    private $contact;
+    #[ORM\ManyToOne(targetEntity: Issue156Contact::class, inversedBy: 'telephoneNumbers')]
+    private ?Issue156Contact $contact = null;
 
-    /**
-     * @var string
-     *
-     * @ORM\Column(type="string", length=255, nullable=false)
-     */
-    private $number;
+    #[ORM\Column(type: Types::STRING, length: 255, nullable: false)]
+    private ?string $number = null;
 
     public function setId(int $id): self
     {

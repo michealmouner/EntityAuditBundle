@@ -14,33 +14,28 @@ declare(strict_types=1);
 namespace SimpleThings\EntityAudit\Action;
 
 use SimpleThings\EntityAudit\AuditReader;
+use SimpleThings\EntityAudit\Exception\InvalidRevisionException;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Twig\Environment;
 
 final class ViewRevisionAction
 {
-    /**
-     * @var AuditReader
-     */
-    private $auditReader;
-
-    /**
-     * @var Environment
-     */
-    private $twig;
-
-    public function __construct(Environment $twig, AuditReader $auditReader)
-    {
-        $this->twig = $twig;
-        $this->auditReader = $auditReader;
+    public function __construct(
+        private Environment $twig,
+        private AuditReader $auditReader
+    ) {
     }
 
+    /**
+     * @throws NotFoundHttpException
+     */
     public function __invoke(int $rev): Response
     {
-        $revision = $this->auditReader->findRevision($rev);
-        if (!$revision) {
-            throw new NotFoundHttpException(sprintf('Revision %i not found', $rev));
+        try {
+            $revision = $this->auditReader->findRevision($rev);
+        } catch (InvalidRevisionException $ex) {
+            throw new NotFoundHttpException(sprintf('Revision %d not found', $rev), $ex);
         }
 
         $changedEntities = $this->auditReader->findEntitiesChangedAtRevision($rev);
