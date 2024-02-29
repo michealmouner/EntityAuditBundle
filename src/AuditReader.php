@@ -241,7 +241,7 @@ class AuditReader
                     ? 're' // root entity
                     : 'e';
 
-            $tableAlias = $class->isInheritanceTypeJoined() && $class->isInheritedField($field) && !$class->isIdentifier($field)
+            $tableAlias = $classMetadata->isInheritanceTypeJoined() && $classMetadata->isInheritedField($field) && !$classMetadata->isIdentifier($field)
                 ? 're' // root entity
                 : 'e';
 
@@ -893,7 +893,7 @@ class AuditReader
         $this->entityCache[$className][$key][$revision] = $entity;
 
         foreach ($data as $field => $value) {
-            $isIgnoredProperty = isset($columnMap[$field]) && $this->config->isEntityIgnoredProperty($class->getName(), $field);
+            $isIgnoredProperty = isset($columnMap[$field]) && $this->config->isEntityIgnoredProperty($classMetadata->getName(), $field);
             if (isset($classMetadata->fieldMappings[$field]) && !$isIgnoredProperty) {
                 $type = Type::getType($classMetadata->fieldMappings[$field]['type']);
                 $value = $type->convertToPHPValue($value, $this->platform);
