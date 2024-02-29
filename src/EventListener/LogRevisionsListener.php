@@ -528,7 +528,7 @@ class LogRevisionsListener implements EventSubscriber
                 continue;
             }
 
-            if ($class->isIdentifier($field) && !empty($entityData[$field]) && is_scalar($entityData[$field])) {
+            if ($class->isIdentifier($field) && !empty($entityData[$field]) && \is_scalar($entityData[$field])) {
                 $params[] = $entityData[$field];
                 $types[] = $class->getTypeOfField($field);
 

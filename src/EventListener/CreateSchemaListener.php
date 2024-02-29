@@ -15,18 +15,14 @@ namespace SimpleThings\EntityAudit\EventListener;
 
 use Doctrine\Common\EventSubscriber;
 use Doctrine\DBAL\Schema\Column;
-use Doctrine\DBAL\DriverManager;
-use Doctrine\ORM\EntityManager;
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Schema\Table;
 use Doctrine\DBAL\Types\Type;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping\ClassMetadataInfo;
-use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\Event\GenerateSchemaEventArgs;
 use Doctrine\ORM\Tools\Event\GenerateSchemaTableEventArgs;
 use Doctrine\ORM\Tools\ToolEvents;
-use ReturnTypeWillChange;
 use SimpleThings\EntityAudit\AuditConfiguration;
 use SimpleThings\EntityAudit\AuditManager;
 use SimpleThings\EntityAudit\Metadata\MetadataFactory;
@@ -56,7 +52,7 @@ class CreateSchemaListener implements EventSubscriber
      *
      * @return string[]
      */
-    #[ReturnTypeWillChange]
+    #[\ReturnTypeWillChange]
     public function getSubscribedEvents()
     {
         return [
@@ -97,8 +93,10 @@ class CreateSchemaListener implements EventSubscriber
         foreach ($entityTable->getColumns() as $column) {
             foreach ($cm->subClasses as $subClass) {
                 if ($cm->hasField($column->getName()) || $cm->hasAssociation($column->getName())) {
-                    if ($this->config->isEntityIgnoredProperty($subClass,
-                        $cm->getFieldForColumn($column->getName()))) {
+                    if ($this->config->isEntityIgnoredProperty(
+                        $subClass,
+                        $cm->getFieldForColumn($column->getName())
+                    )) {
                         continue 2;
                     }
                 }
@@ -184,9 +182,9 @@ class CreateSchemaListener implements EventSubscriber
             \ARRAY_FILTER_USE_KEY
         );
         // Change Enum type to String.
-        if($this->config->getDatabasePlatform()){
+        if (null !== $this->config->getDatabasePlatform()) {
             $sqlString = $column->getType()->getSQLDeclaration($columnArrayOptions, $this->config->getDatabasePlatform());
-            if ($this->config->getConvertEnumToString() && false !== strpos($sqlString, 'ENUM')) {
+            if ($this->config->getConvertEnumToString() && str_contains($sqlString, 'ENUM')) {
                 $columnTypeName = Types::STRING;
                 $columnArrayOptions['type'] = Type::getType($columnTypeName);
             }

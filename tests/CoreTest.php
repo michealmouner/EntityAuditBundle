@@ -414,7 +414,7 @@ final class CoreTest extends BaseTest
         $revision = $reader->getCurrentRevision(ArticleAudit::class, $articleId);
         static::assertSame('2', (string) $revision);
 
-        $article->setIgnoreme('textnew');
+        $article->setIgnoreMe('textnew');
         $em->persist($article);
         $em->flush();
 

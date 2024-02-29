@@ -17,7 +17,7 @@ class ConfigurationNotSetException extends \Exception
 {
     public function __construct(string $configName)
     {
-        parent::__construct($configName, null, null);
+        parent::__construct($configName);
 
         $this->message = sprintf('Config "%s" must be set.', $configName);
     }

@@ -16,8 +16,8 @@ namespace SimpleThings\EntityAudit;
 use Doctrine\DBAL\Platforms\AbstractPlatform;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping\ClassMetadataInfo;
-use SimpleThings\EntityAudit\Metadata\MetadataFactory;
 use SimpleThings\EntityAudit\Exception\ConfigurationNotSetException;
+use SimpleThings\EntityAudit\Metadata\MetadataFactory;
 
 class AuditConfiguration
 {
@@ -29,7 +29,9 @@ class AuditConfiguration
     private array $auditedEntityClasses = [];
 
     private bool $disableForeignKeys = false;
-
+    /**
+     * @var array <string, string[]>
+     */
     private array $entityIgnoredProperties = [];
 
     /**
@@ -53,11 +55,11 @@ class AuditConfiguration
      * @var callable|null
      */
     private $usernameCallable;
-    private $convertEnumToString = false;
+    private bool $convertEnumToString = false;
     /**
      * @var AbstractPlatform|null
      */
-    private $databasePlatform = null;
+    private $databasePlatform;
 
     /**
      * @param string[] $classes
@@ -190,7 +192,10 @@ class AuditConfiguration
         $this->auditedEntityClasses = $classes;
     }
 
-    public function getGlobalIgnoreColumns()
+    /**
+     * @return string[]
+     */
+    public function getGlobalIgnoreColumns(): array
     {
         return $this->globalIgnoreColumns;
     }
@@ -299,9 +304,9 @@ class AuditConfiguration
     }
 
     /**
-     * @return array<string, string[]>
+     * @return string[]
      */
-    final public function getEntityIgnoredProperties($entity): array
+    final public function getEntityIgnoredProperties(string $entity): array
     {
         return $this->entityIgnoredProperties[$entity] ?? [];
     }
@@ -314,7 +319,7 @@ class AuditConfiguration
         $this->entityIgnoredProperties = $fields;
     }
 
-    public function isEntityIgnoredProperty(string $entity, $propertyName): bool
+    public function isEntityIgnoredProperty(string $entity, string $propertyName): bool
     {
         return \in_array($propertyName, $this->getEntityIgnoredProperties($entity), true);
     }

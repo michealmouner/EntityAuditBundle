@@ -26,7 +26,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Clock\ClockInterface;
 use SimpleThings\EntityAudit\AuditConfiguration;
 use SimpleThings\EntityAudit\AuditManager;
-use SimpleThings\EntityAudit\Tests\Fixtures\Core\ProfileAudit;
+use Sonata\EntityAuditBundle\Tests\Fixtures\Core\ProfileAudit;
 
 abstract class BaseTest extends TestCase
 {
